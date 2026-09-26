@@ -1,0 +1,73 @@
+name: Deploy voice function
+
+# Installs (or updates) the small Google Cloud function the Read Me app calls
+# when you tap Listen on an email that hasn't been voiced yet, and that saves
+# your "always voice" settings. Runs when you start it from the Actions tab,
+# and on later code changes once the VOICE_FUNCTION variable is set to "on".
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "function/**"
+      - "article.py"
+      - "voice.py"
+      - "store.py"
+      - ".github/workflows/deploy-voice.yml"
+
+concurrency:
+  group: deploy-voice
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || vars.VOICE_FUNCTION == 'on'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - name: Deploy
+        env:
+          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
+          GCS_BUCKET: ${{ vars.GCS_BUCKET }}
+          FEED_SECRET: ${{ vars.FEED_SECRET }}
+          MONTHLY_CHAR_LIMIT: ${{ vars.MONTHLY_CHAR_LIMIT }}
+          ALWAYS_VOICE: ${{ vars.ALWAYS_VOICE }}
+          TTS_VOICE: ${{ vars.TTS_VOICE }}
+          TTS_SPEAKING_RATE: ${{ vars.TTS_SPEAKING_RATE }}
+          # For "check for new mail now": a fine-grained GitHub token that can
+          # start this repo's workflows (Actions: read and write).
+          GH_TOKEN: ${{ secrets.READ_ME_GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          GH_REF: ${{ github.event.repository.default_branch }}
+          REGION: us-central1
+        run: |
+          mkdir -p build
+          cp function/main.py function/requirements.txt article.py voice.py store.py build/
+          python3 - <<'PY'
+          import json, os
+          names = ["GCS_BUCKET", "FEED_SECRET", "MONTHLY_CHAR_LIMIT", "ALWAYS_VOICE", "TTS_VOICE",
+                   "TTS_SPEAKING_RATE", "GH_TOKEN", "GH_REPO", "GH_REF"]
+          with open("env.yaml", "w") as f:
+              for name in names:
+                  if os.environ.get(name):
+                      f.write(f"{name}: {json.dumps(os.environ[name])}\n")
+          PY
+          SA_EMAIL=$(python3 -c 'import json,os; print(json.loads(os.environ["GCP_SERVICE_ACCOUNT_JSON"])["client_email"])')
+          gcloud functions deploy readme-voice \
+            --gen2 --region="$REGION" --runtime=python312 \
+            --source=build --entry-point=handle --trigger-http --allow-unauthenticated \
+            --service-account="$SA_EMAIL" --memory=512Mi --timeout=120s --max-instances=2 \
+            --env-vars-file=env.yaml --quiet
+          URL=$(gcloud functions describe readme-voice --gen2 --region="$REGION" --format='value(serviceConfig.uri)')
+          # Tell the app where the function is.
+          printf '{"voiceUrl": "%s"}\n' "$URL" > config.json
+          gcloud storage cp config.json "gs://$GCS_BUCKET/$FEED_SECRET/config.json" \
+            --content-type=application/json --cache-control="no-cache, max-age=0"
+          echo "Voice function is live."

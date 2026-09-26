@@ -1,0 +1,5 @@
+functions-framework>=3.8,<4
+google-cloud-texttospeech>=2.37,<3
+google-cloud-storage>=3.15,<4
+beautifulsoup4>=4.15,<5
+mutagen>=1.48,<2

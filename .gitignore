@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+*.mp3
+gcp-key*.json
+.pytest_cache/

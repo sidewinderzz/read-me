@@ -1,0 +1,69 @@
+name: Read my emails
+
+on:
+  schedule:
+    - cron: "17 * * * *" # every hour, at 17 past
+  workflow_dispatch: # adds a "Run workflow" button for reading right now
+
+# Never run two at once, so an email can't be read twice.
+concurrency:
+  group: read-emails
+  cancel-in-progress: false
+
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check setup
+        id: setup
+        env:
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$GMAIL_APP_PASSWORD" ] || [ -z "$GCP_SERVICE_ACCOUNT_JSON" ]; then
+            echo "Secrets aren't set up yet, skipping. See README.md."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.setup.outputs.ready == 'true'
+
+      - uses: actions/setup-python@v7
+        if: steps.setup.outputs.ready == 'true'
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        if: steps.setup.outputs.ready == 'true'
+        run: pip install -r requirements.txt
+
+      - name: Read emails
+        if: steps.setup.outputs.ready == 'true'
+        env:
+          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_WORKSPACE_ID: ${{ vars.ANTHROPIC_WORKSPACE_ID }}
+          # Plain variables (Settings > Secrets and variables > Actions > Variables).
+          # FEED_SECRET is a variable rather than a secret so the feed address
+          # prints un-masked at the end of the log.
+          GCS_BUCKET: ${{ vars.GCS_BUCKET }}
+          FEED_SECRET: ${{ vars.FEED_SECRET }}
+          GMAIL_LABEL: ${{ vars.GMAIL_LABEL }}
+          FEED_TITLE: ${{ vars.FEED_TITLE }}
+          TTS_VOICE: ${{ vars.TTS_VOICE }}
+          TTS_SPEAKING_RATE: ${{ vars.TTS_SPEAKING_RATE }}
+          CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}
+          MONTHLY_CHAR_LIMIT: ${{ vars.MONTHLY_CHAR_LIMIT }}
+          KEEP_DAYS: ${{ vars.KEEP_DAYS }}
+          # Only used until you change the list in the app's settings.
+          ALWAYS_VOICE: ${{ vars.ALWAYS_VOICE }}
+        run: |
+          printf '%s' "$GCP_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/gcp.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/gcp.json"
+          python main.py

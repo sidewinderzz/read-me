@@ -1,0 +1,1144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f7f6f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111110" media="(prefers-color-scheme: dark)">
+<title>Read Me</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400..700&display=swap" rel="stylesheet">
+<style>
+/* Ledger theme: paper by day, ink by night. Square corners, rules instead of
+   cards, one accent, mono for figures and labels. */
+:root{--hl:#e7eee3;--seen:#ecebe6;--page:#f7f6f3;--fg1:#14140f;--fg2:#5b5a52;--fg3:#6f6d64;--acc:#0e700e;--crit:#9c2f1f;--rule:#dedcd4;--ui:"Space Grotesk",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--hl:#1b2519;--seen:#1b1b19;--page:#111110;--fg1:#f2f1ec;--fg2:#a8a69c;--fg3:#8b8981;--acc:#73ac73;--crit:#c6867d;--rule:#2b2b28;color-scheme:dark}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{overscroll-behavior-y:contain;margin:0;background:var(--page);color:var(--fg1);font-family:var(--ui);font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.wrap{max-width:640px;margin:0 auto;padding:20px 16px calc(190px + env(safe-area-inset-bottom))}
+.label{font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--fg3)}
+header{position:relative;display:flex;flex-direction:column;gap:4px;padding:8px 0 18px;border-bottom:2px solid var(--fg1)}
+#menu{position:absolute;top:0;right:0;width:44px;height:40px;border:1px solid var(--rule);font-size:22px;line-height:1;color:var(--fg2)}
+#install{position:absolute;top:0;right:52px;height:40px;padding:0 14px;border:1px solid var(--rule);font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--acc)}
+h1{margin:0;font-size:28px;line-height:1.15;font-weight:600;letter-spacing:-.02em;text-wrap:balance}
+.count{font-family:var(--mono);font-size:13px;color:var(--fg2)}
+ol{list-style:none;margin:0;padding:0}
+/* Like Gmail: unread rows are bright with bold titles; read rows sit on a
+   slightly grey band with softer text. The band runs edge to edge. */
+.ep{display:flex;align-items:stretch;border-bottom:1px solid var(--rule);margin:0 -16px;padding:0 16px}
+.ep:not(.unread){background:var(--seen)}
+/* Swipe right to remove: the row slides over a red strip. */
+.ep{position:relative;overflow:hidden;touch-action:pan-y}
+.ep .under{position:absolute;inset:0;display:flex;align-items:center;padding-left:16px;background:var(--crit);color:var(--page);font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;visibility:hidden}
+.ep.swiping .under{visibility:visible}
+.ep .slide{position:relative;display:flex;flex:1;min-width:0;background:inherit;will-change:transform}
+.ep.swiping .slide{background:var(--page)}
+.ep.swiping:not(.unread) .slide{background:var(--seen)}
+.ep.gone{transition:height .2s ease,opacity .2s ease;opacity:0}
+#toast{position:fixed;z-index:25;left:16px;right:16px;bottom:24px;max-width:608px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:0 0 0 16px;background:var(--fg1);color:var(--page);font-size:14px}
+#toast[hidden]{display:none}
+#toast span{flex:1}
+#toast button{height:48px;padding:0 16px;font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--page)}
+.ep:last-child{border-bottom:0}
+.ep .row{flex:1;min-width:0;display:flex;gap:14px;align-items:flex-start;text-align:left;padding:16px 0;min-height:72px}
+.mark{display:none;flex:none;width:14px;margin-top:6px;height:14px;border:1px solid var(--fg3)}
+.ep.on .mark{display:block}  /* only the email that's playing gets a marker */
+/* Unread: a filled accent square and a bold title. Read: hollow square, softer title. */
+.ep.on .mark{border-color:var(--acc);background:transparent;box-shadow:inset 0 0 0 3px var(--page),inset 0 0 0 7px var(--acc)}
+.ep .txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.ep b{font-size:17px;font-weight:600;line-height:1.3;letter-spacing:-.01em;text-wrap:pretty}
+.ep b{color:var(--fg2);font-weight:500}
+.ep:not(.unread) .meta{color:var(--fg3);opacity:.85}
+.ep.unread b{color:var(--fg1);font-weight:700}
+.ep.on b{color:var(--acc)}
+.meta{font-family:var(--mono);font-size:12px;color:var(--fg3);display:flex;flex-wrap:wrap;gap:4px 12px}
+.meta .left,.meta .aud{color:var(--acc)}
+.empty{padding:40px 0;color:var(--fg2)}
+/* Pull down on the list to check for new mail. */
+#pull{height:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--fg2);transition:height .15s}
+#pull.busy{height:44px;color:var(--acc)}
+.meta .saved{color:var(--fg3)}
+.sub{margin-top:36px;padding-top:14px;border-top:1px solid var(--rule);display:flex;flex-direction:column;gap:10px}
+.sub p{margin:0;color:var(--fg2);font-size:14px;text-wrap:pretty}
+.feed{display:flex;border:1px solid var(--rule)}
+.feed code{flex:1;min-width:0;padding:10px 12px;font-family:var(--mono);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fg2)}
+.feed button{flex:none;padding:0 16px;border-left:1px solid var(--rule);font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--acc)}
+.bar{position:fixed;z-index:20;left:0;right:0;bottom:0;background:var(--page);border-top:2px solid var(--fg1);padding:12px 16px calc(14px + env(safe-area-inset-bottom))}
+.bar .in{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.now{display:flex;align-items:baseline;gap:10px;min-width:0}
+.now b{flex:1;min-width:0;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.now .label{flex:none}
+.track{position:relative;height:28px;display:flex;align-items:center;cursor:pointer;touch-action:none}
+.track .line{position:absolute;left:0;right:0;height:2px;background:var(--rule)}
+.track .fill{position:absolute;left:0;height:2px;background:var(--acc);width:0}
+.track .knob{position:absolute;width:12px;height:12px;background:var(--acc);transform:translateX(-6px);left:0}
+.times{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;color:var(--fg3);margin-top:-6px}
+.ctl{display:flex;align-items:stretch;border:1px solid var(--rule)}
+.ctl button{flex:1;height:52px;display:flex;align-items:center;justify-content:center;gap:6px;font-family:var(--mono);font-size:13px;font-weight:500}
+.ctl button+button{border-left:1px solid var(--rule)}
+.ctl .play{flex:1.4;color:var(--acc)}
+.ctl svg{width:22px;height:22px;fill:currentColor}
+.err{color:var(--crit);font-family:var(--mono);font-size:12px}
+.reader{position:fixed;inset:0;z-index:10;background:var(--page);overflow-y:auto;overscroll-behavior:contain;scroll-padding:64px 0 230px}
+.reader[hidden]{display:none}
+.rbar{position:sticky;top:0;background:var(--page);border-bottom:2px solid var(--fg1)}
+.rbar .in{max-width:680px;margin:0 auto;height:56px;padding:0 16px;display:flex;align-items:center;gap:8px}
+.rbar button{height:44px;font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase}
+#rBack{color:var(--fg2);padding-right:10px}
+#rSize{margin-left:auto;padding:0 14px;color:var(--fg2);letter-spacing:0;text-transform:none;font-size:15px}
+#rListen{padding:0 18px;background:var(--acc);color:var(--page);border:1px solid var(--acc)}
+.article{max-width:680px;margin:0 auto;padding:22px 16px calc(210px + env(safe-area-inset-bottom));--read:18px}
+.headline{margin:8px 0 12px;font-size:30px;line-height:1.15;font-weight:600;letter-spacing:-.025em;text-wrap:balance}
+.article .meta{padding-bottom:16px;margin-bottom:26px;border-bottom:2px solid var(--fg1)}
+.story{font-size:var(--read);line-height:1.65}
+.story>*,.story li{margin:0 0 1em}
+.story p,.story li,.story blockquote{text-wrap:pretty;overflow-wrap:anywhere}
+.story h2{margin:1.6em 0 .6em;font-size:calc(var(--read) * 1.35);line-height:1.25;font-weight:600;letter-spacing:-.015em;text-wrap:balance}
+.story h3{margin:1.4em 0 .5em;font-size:calc(var(--read) * 1.1);line-height:1.3;font-weight:600}
+.story ul{padding-left:1.2em}
+.story li{margin-bottom:.5em}
+.story blockquote{margin-left:0;margin-right:0;padding-left:14px;border-left:2px solid var(--fg1);color:var(--fg2)}
+.story figure{margin:1.5em 0}
+.story img{display:block;max-width:100%;height:auto;margin:0 auto}
+.story a{color:var(--acc);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px}
+.story .status{color:var(--fg2);font-family:var(--mono);font-size:13px}
+/* Read-along: the paragraph being spoken gets a tinted band and an accent rule. */
+.story [data-t]{scroll-margin:96px;transition:background-color .25s,box-shadow .25s}
+.story.synced [data-t]{cursor:pointer}
+.story table.data{width:100%;border-collapse:collapse;margin:0 0 1.2em;font-family:var(--mono);font-size:calc(var(--read) * .78);font-variant-numeric:tabular-nums}
+.story table.data td{padding:8px 6px;border-bottom:1px solid var(--rule);vertical-align:baseline}
+.story table.data tr:first-child td{border-top:2px solid var(--fg1)}
+.story table.data td.num{text-align:right;white-space:nowrap}
+.story table.data td.up{color:var(--acc)}
+.story table.data td.down{color:var(--crit)}
+.story tr.speaking td{background:var(--hl)}
+.story.synced [data-g]{cursor:pointer}
+.story .speaking{background:var(--hl);box-shadow:-10px 0 0 var(--hl),10px 0 0 var(--hl),-13px 0 0 var(--acc)}
+#follow{position:fixed;z-index:15;left:50%;transform:translateX(-50%);bottom:200px;height:40px;padding:0 16px;background:var(--fg1);color:var(--page);font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase}
+#follow[hidden]{display:none}
+.notice{margin:0 0 20px;padding:10px 12px;border:1px solid var(--rule);color:var(--fg2);font-family:var(--mono);font-size:12.5px;line-height:1.5}
+#rListen[disabled]{background:transparent;color:var(--fg3);border-color:var(--rule);cursor:progress}
+#nowTitle{cursor:pointer}
+/* Settings: a sheet that slides up from the bottom. */
+.sheetwrap{position:fixed;inset:0;z-index:30}
+.sheetwrap[hidden]{display:none}
+.dim{position:absolute;inset:0;background:rgba(20,20,15,.4)}
+.sheet{position:absolute;left:0;right:0;bottom:0;max-height:88vh;overflow-y:auto;overscroll-behavior:contain;background:var(--page);border-top:2px solid var(--fg1);padding:18px 16px calc(28px + env(safe-area-inset-bottom))}
+.sheet .in{max-width:640px;margin:0 auto}
+.sheet .top{display:flex;align-items:center;justify-content:space-between}
+.sheet h2{margin:0;font-size:22px;font-weight:600;letter-spacing:-.015em}
+#sDone{height:44px;padding:0 4px;font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--fg2)}
+.sec{margin-top:18px}
+.sec p{margin:6px 0 10px;color:var(--fg2);font-size:14px;line-height:1.45;text-wrap:pretty}
+.srow{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--rule)}
+.srow .who{flex:1;min-width:0}
+.srow b{display:block;font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srow small{display:block;font-family:var(--mono);font-size:11.5px;color:var(--fg3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tg{flex:none;position:relative;width:52px;height:30px;border:1px solid var(--fg3)}
+.tg i{position:absolute;top:3px;left:3px;width:22px;height:22px;background:var(--fg3);transition:left .15s}
+.tg[aria-checked="true"]{border-color:var(--acc);background:var(--acc)}
+.tg[aria-checked="true"] i{left:25px;background:var(--page)}
+.tg[disabled]{opacity:.5}
+.meter{height:8px;background:var(--rule);margin:10px 0 6px}
+.meter span{display:block;height:100%;width:0;background:var(--acc)}
+.fig{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;color:var(--fg2)}
+#sNote{color:var(--fg2);font-family:var(--mono);font-size:12px;margin-top:12px}
+.vrow{display:flex;align-items:center;gap:12px;border-top:1px solid var(--rule)}
+.vrow .pick{flex:1;display:flex;align-items:center;gap:12px;min-height:52px;text-align:left;font-size:16px}
+.vrow .dot{flex:none;width:18px;height:18px;border:1px solid var(--fg3)}
+.vrow .pick[aria-checked="true"] .dot{border-color:var(--acc);background:var(--acc);box-shadow:inset 0 0 0 4px var(--page)}
+.vrow .pick[aria-checked="true"]{font-weight:600}
+.vrow .hear{flex:none;height:44px;padding:0 12px;font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--acc)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{height:44px;min-width:56px;padding:0 12px;border:1px solid var(--rule);font-family:var(--mono);font-size:13px}
+.chips button[aria-pressed="true"]{border-color:var(--acc);background:var(--acc);color:var(--page)}
+.wide{width:100%;height:48px;border:1px solid var(--rule);font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--acc)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="label">Your emails, out loud</span>
+    <button type="button" id="install" hidden>Install</button>
+    <button type="button" id="menu" aria-label="Settings" aria-haspopup="dialog">⋮</button>
+    <h1 id="title"></h1>
+    <span class="count" id="count"></span>
+  </header>
+  <div id="pull" aria-live="polite"></div>
+  <ol id="list"></ol>
+  <section class="sub">
+    <span class="label">Listen in a podcast app</span>
+    <p>Add this feed by URL in Apple Podcasts, Pocket Casts, Overcast or AntennaPod and new emails arrive as episodes.</p>
+    <div class="feed"><code id="feed"></code><button id="copy" type="button">Copy</button></div>
+  </section>
+</div>
+
+<section class="reader" id="reader" hidden aria-labelledby="rTitle">
+  <div class="rbar"><div class="in">
+    <button type="button" id="rBack">← Back</button>
+    <button type="button" id="rSize" aria-label="Text size">Aa</button>
+    <button type="button" id="rListen">▶ Listen</button>
+  </div></div>
+  <article class="article" id="article">
+    <span class="label" id="rFrom"></span>
+    <h1 class="headline" id="rTitle"></h1>
+    <div class="meta" id="rMeta"></div>
+    <div class="story" id="rBody"></div>
+  </article>
+  <button type="button" id="follow" hidden>↓ Follow along</button>
+</section>
+
+<div class="bar" id="bar" hidden>
+  <div class="in">
+    <div class="now"><span class="label" id="state">Paused</span><b id="nowTitle"></b></div>
+    <div>
+      <div class="track" id="track" role="slider" aria-label="Position" tabindex="0">
+        <div class="line"></div><div class="fill" id="fill"></div><div class="knob" id="knob"></div>
+      </div>
+      <div class="times"><span id="pos">0:00</span><span id="dur">0:00</span></div>
+    </div>
+    <div class="ctl">
+      <button type="button" id="back" aria-label="Back 15 seconds"><svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></svg>15</button>
+      <button type="button" class="play" id="play" aria-label="Play"><svg viewBox="0 0 24 24" id="playIcon"><path d="M8 5v14l11-7z"/></svg></button>
+      <button type="button" id="fwd" aria-label="Forward 30 seconds">30<svg viewBox="0 0 24 24"><path d="M12 5V1l5 5-5 5V7a6 6 0 1 0 6 6h2a8 8 0 1 1-8-8z"/></svg></button>
+      <button type="button" id="speed" aria-label="Playback speed">1×</button>
+    </div>
+    <span class="err" id="err" hidden></span>
+  </div>
+</div>
+
+<div id="toast" role="status" hidden><span id="toastText"></span><button type="button" id="undo">Undo</button></div>
+
+<div class="sheetwrap" id="settings" hidden>
+  <div class="dim" id="sDim"></div>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="sTitle">
+    <div class="in">
+      <div class="top"><h2 id="sTitle">Settings</h2><button type="button" id="sDone">Done</button></div>
+      <div class="sec">
+        <span class="label">Always voice</span>
+        <p>Audio is made as soon as these arrive, ready offline and in your podcast app. Everything else is voiced when you tap Listen.</p>
+        <div id="sList"></div>
+      </div>
+      <div class="sec">
+        <span class="label">Free voice this month</span>
+        <div class="meter"><span id="sMeter"></span></div>
+        <div class="fig"><span id="sUsed">–</span><span id="sLimit"></span></div>
+      </div>
+      <div class="sec">
+        <span class="label">Voice</span>
+        <p>Used for new audio. Emails that already have audio keep their voice.</p>
+        <div id="sVoices"></div>
+      </div>
+      <div class="sec">
+        <span class="label">Listening speed</span>
+        <p>Your usual speed on this phone. The 1× button in the player still changes it on the fly.</p>
+        <div class="chips" id="sSpeeds"></div>
+      </div>
+      <div class="sec">
+        <button type="button" class="wide" id="sCheck">↻ Check for new mail now</button>
+      </div>
+      <div id="sNote" hidden></div>
+    </div>
+  </section>
+</div>
+
+<audio id="audio" preload="metadata"></audio>
+
+<script>
+const TITLE = __TITLE_JSON__;
+const FEED_URL = __FEED_URL_JSON__;
+const EPISODES = __EPISODES_JSON__;
+const EXTRAS = __EXTRAS_JSON__;  // senders, always-voice list, monthly limit, folder
+
+const $ = id => document.getElementById(id);
+const audio = $("audio");
+const SPEEDS = [1, 1.25, 1.5, 1.75, 2, 0.85];
+
+// Per-device memory of where you stopped. Never required: the page works
+// the same if the browser blocks storage.
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("ra:" + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("ra:" + k, JSON.stringify(v)); } catch {} },
+};
+let progress = store.get("progress", {});   // id -> {t: seconds, d: duration, done: bool, seen: bool}
+let current = null;
+
+// Emails you've swiped away. Hidden on this phone right away; once the voice
+// function is set up, the next hourly run also deletes them for good.
+let removed = new Set(store.get("removed", []));
+const visible = () => EPISODES.filter(e => !removed.has(e.id));
+
+// An email counts as read once you've opened it or started listening.
+const isUnread = ep => { const p = progress[ep.id] || {}; return !(p.seen || p.done || p.t > 5); };
+function markSeen(ep) {
+  if (!isUnread(ep)) return;
+  progress[ep.id] = { ...(progress[ep.id] || {}), seen: true };
+  store.set("progress", progress);
+}
+
+// ~15 characters a second is a normal reading pace.
+const estMinutes = ep => Math.max(1, Math.round(ep.chars / 900));
+const clock = s => {
+  s = Math.max(0, Math.floor(s || 0));
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = String(s % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
+};
+const day = iso => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+// ~1,200 characters a minute is an easy reading pace.
+const readMinutes = ep => Math.max(1, Math.round(ep.chars / 1200));
+
+// The voice function (set up by the "Deploy voice function" workflow) makes
+// audio on demand and saves settings. Its address is in config.json.
+let VOICE_URL = "";
+const voiceReady = fetch("config.json", { cache: "no-store" })
+  .then(r => (r.ok ? r.json() : {})).then(c => { VOICE_URL = c.voiceUrl || ""; }).catch(() => {});
+
+async function callVoice(action, extra = {}) {
+  await voiceReady;
+  if (!VOICE_URL) throw new Error("The voice function isn't set up yet (see the README).");
+  let res;
+  try {
+    res = await fetch(VOICE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ secret: EXTRAS.folder, action, ...extra }),
+    });
+  } catch {
+    throw new Error("Couldn't reach the voice function. Check your signal and try again.");
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `The voice function said no (${res.status}).`);
+  return data;
+}
+
+function render() {
+  document.title = TITLE;
+  $("title").textContent = TITLE;
+  $("feed").textContent = FEED_URL;
+  const shown = visible();
+  const unread = shown.filter(isUnread).length;
+  $("count").textContent = shown.length
+    ? `${unread} unread · ${shown.length} total`
+    : "";
+  const list = $("list");
+  list.replaceChildren();
+  if (!shown.length) {
+    const li = document.createElement("li");
+    li.className = "empty";
+    li.textContent = "Nothing yet. Label an email ReadMe in Gmail and it shows up here within the hour.";
+    list.append(li);
+    return;
+  }
+  for (const ep of shown) {
+    const p = progress[ep.id] || {};
+    const li = document.createElement("li");
+    li.className = "ep" + (isUnread(ep) ? " unread" : "") + (p.done ? " done" : "") + (current && current.id === ep.id ? " on" : "");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "row";
+    // Like an inbox: tapping an email opens it to read. Audio only starts
+    // when you tap Listen there.
+    btn.setAttribute("aria-label", `Open ${ep.title}`);
+    btn.addEventListener("click", e => { if (li.dataset.swiped) { e.preventDefault(); return; } openReader(ep); });
+    const mark = document.createElement("span");
+    mark.className = "mark";
+    const txt = document.createElement("span");
+    txt.className = "txt";
+    const b = document.createElement("b");
+    b.textContent = ep.title;
+    const meta = document.createElement("span");
+    meta.className = "meta";
+    const bits = [ep.sender, day(ep.published)];
+    if (p.done) bits.push("Played");
+    else if (p.t > 5 && p.d) bits.push({ cls: "left", text: `${Math.ceil((p.d - p.t) / 60)} min left` });
+    else if (ep.url) bits.push({ cls: "aud", text: `▶ ~${estMinutes(ep)} min` });
+    else bits.push(`${readMinutes(ep)} min read`);
+    if (ep.url && isSaved(ep)) bits.push({ cls: "saved", text: "saved" });
+    for (const bit of bits) {
+      const s = document.createElement("span");
+      if (typeof bit === "object") { s.className = bit.cls; s.textContent = bit.text; }
+      else s.textContent = bit;
+      meta.append(s);
+    }
+    txt.append(b, meta);
+    btn.append(mark, txt);
+    const under = document.createElement("div");
+    under.className = "under";
+    under.textContent = "Remove";
+    const slide = document.createElement("div");
+    slide.className = "slide";
+    slide.append(btn);
+    li.append(under, slide);
+    swipeToRemove(li, slide, ep);
+    list.append(li);
+  }
+}
+
+// Swipe a row right to remove it. Only a clear sideways drag counts, so
+// scrolling the list and tapping to open still work as usual.
+function swipeToRemove(li, slide, ep) {
+  let x0 = null, y0 = 0, dx = 0, dragging = false, pid = null;
+  slide.addEventListener("pointerdown", e => {
+    if (e.button > 0) return;
+    x0 = e.clientX; y0 = e.clientY; dx = 0; dragging = false; pid = e.pointerId;
+  });
+  slide.addEventListener("pointermove", e => {
+    if (x0 === null || e.pointerId !== pid) return;
+    const mx = e.clientX - x0, my = e.clientY - y0;
+    if (!dragging) {
+      if (Math.abs(my) > 10 && Math.abs(my) > Math.abs(mx)) { x0 = null; return; }
+      if (mx < 12 || mx < Math.abs(my) * 1.5) return;
+      dragging = true;
+      li.classList.add("swiping");
+      try { slide.setPointerCapture(pid); } catch {}
+    }
+    dx = Math.max(0, mx);
+    slide.style.transform = `translateX(${dx}px)`;
+  });
+  const end = () => {
+    if (x0 === null) return;
+    x0 = null;
+    if (!dragging) return;
+    li.dataset.swiped = "1";  // the tap that ends a swipe shouldn't open the email
+    setTimeout(() => delete li.dataset.swiped, 400);
+    slide.style.transition = "transform .18s ease";
+    if (dx > li.offsetWidth * 0.35) {
+      slide.style.transform = `translateX(${li.offsetWidth}px)`;
+      setTimeout(() => removeEmail(ep, li), 180);
+    } else {
+      slide.style.transform = "";
+      setTimeout(() => { slide.style.transition = ""; li.classList.remove("swiping"); }, 200);
+    }
+  };
+  slide.addEventListener("pointerup", end);
+  slide.addEventListener("pointercancel", end);
+}
+
+let pendingRemoval = null;  // {ep, timer}: sent to the server once Undo has timed out
+function sendRemoval() {
+  if (!pendingRemoval) return;
+  clearTimeout(pendingRemoval.timer);
+  const { ep } = pendingRemoval;
+  pendingRemoval = null;
+  $("toast").hidden = true;
+  callVoice("remove", { id: ep.id }).catch(() => {});  // still hidden here if this fails
+}
+function removeEmail(ep, li) {
+  sendRemoval();  // a previous removal no longer needs its Undo
+  li.style.height = li.offsetHeight + "px";
+  void li.offsetHeight;
+  li.classList.add("gone");
+  li.style.height = "0";
+  setTimeout(() => {
+    removed.add(ep.id);
+    store.set("removed", [...removed]);
+    if (current && current.id === ep.id) {
+      audio.pause();
+      audio.removeAttribute("src");
+      current = null;
+      $("bar").hidden = true;
+    }
+    render();
+    $("toastText").textContent = `Removed “${ep.title}”`;
+    $("toast").style.bottom = ($("bar").hidden ? 24 : $("bar").offsetHeight + 12) + "px";
+    $("toast").hidden = false;
+    pendingRemoval = { ep, timer: setTimeout(sendRemoval, 5000) };
+  }, 200);
+}
+$("undo").addEventListener("click", () => {
+  if (!pendingRemoval) return;
+  clearTimeout(pendingRemoval.timer);
+  removed.delete(pendingRemoval.ep.id);
+  store.set("removed", [...removed]);
+  pendingRemoval = null;
+  $("toast").hidden = true;
+  render();
+});
+// Forget removals the server has already carried out.
+removed = new Set([...removed].filter(id => EPISODES.some(e => e.id === id)));
+store.set("removed", [...removed]);
+
+let blobUrl = null;
+async function start(ep) {
+  markSeen(ep);
+  if (!ep.url) { makeAudio(ep); return; }
+  if (current && current.id === ep.id) { toggle(); return; }
+  current = ep;
+  $("err").hidden = true;
+  const src = await audioSource(ep);  // the saved copy on this phone, if there is one
+  if (current !== ep) return;
+  if (blobUrl) URL.revokeObjectURL(blobUrl);
+  blobUrl = src.startsWith("blob:") ? src : null;
+  audio.src = src;
+  if (!blobUrl) saveAudio(ep);  // keep a copy for next time, and for no signal
+  audio.playbackRate = store.get("speed", 1);
+  const p = progress[ep.id] || {};
+  audio.addEventListener("loadedmetadata", function once() {
+    audio.removeEventListener("loadedmetadata", once);
+    if (p.t && !p.done && p.t < audio.duration - 3) audio.currentTime = p.t;
+  });
+  audio.play().catch(() => {});
+  $("bar").hidden = false;
+  $("nowTitle").textContent = ep.title;
+  if ("mediaSession" in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({ title: ep.title, artist: ep.sender, album: TITLE });
+  }
+  render();
+}
+
+function toggle() { audio.paused ? audio.play().catch(() => {}) : audio.pause(); }
+function skip(by) { if (audio.duration) audio.currentTime = Math.min(Math.max(0, audio.currentTime + by), audio.duration - 0.5); }
+
+function save(done) {
+  if (!current || !audio.duration) return;
+  const prev = progress[current.id] || {};
+  progress[current.id] = { ...prev, t: audio.currentTime, d: audio.duration, done: !!done || !!prev.done };
+  store.set("progress", progress);
+}
+
+function paint() {
+  const d = audio.duration || 0, t = audio.currentTime || 0;
+  const pct = d ? (t / d) * 100 : 0;
+  $("fill").style.width = pct + "%";
+  $("knob").style.left = pct + "%";
+  $("pos").textContent = clock(t);
+  $("dur").textContent = clock(d);
+  $("track").setAttribute("aria-valuenow", Math.round(pct));
+}
+
+function setPlaying(on) {
+  $("state").textContent = on ? "Playing" : "Paused";
+  $("play").setAttribute("aria-label", on ? "Pause" : "Play");
+  $("playIcon").innerHTML = on ? '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
+}
+
+let lastSave = 0;
+audio.addEventListener("timeupdate", () => {
+  paint();
+  if (Date.now() - lastSave > 5000) { lastSave = Date.now(); save(false); }
+});
+audio.addEventListener("play", () => setPlaying(true));
+audio.addEventListener("pause", () => { setPlaying(false); save(false); render(); });
+// When an email finishes, stop there: audio only plays when you ask for it.
+audio.addEventListener("ended", () => { save(true); render(); });
+audio.addEventListener("error", () => {
+  $("err").textContent = "Couldn't load this episode. It may have expired.";
+  $("err").hidden = false;
+});
+
+$("play").addEventListener("click", toggle);
+// Tap the title in the player to get back to what's playing.
+$("nowTitle").addEventListener("click", () => { if (current && reading !== current) openReader(current); });
+$("back").addEventListener("click", () => skip(-15));
+$("fwd").addEventListener("click", () => skip(30));
+$("speed").addEventListener("click", () => {
+  const next = SPEEDS[(SPEEDS.indexOf(audio.playbackRate) + 1) % SPEEDS.length] || 1;
+  audio.playbackRate = next;
+  store.set("speed", next);
+  $("speed").textContent = next + "×";
+});
+$("speed").textContent = store.get("speed", 1) + "×";
+
+const track = $("track");
+function seekTo(clientX) {
+  const r = track.getBoundingClientRect();
+  if (audio.duration) audio.currentTime = Math.min(Math.max(0, (clientX - r.left) / r.width), 1) * audio.duration;
+}
+track.addEventListener("pointerdown", e => {
+  track.setPointerCapture(e.pointerId);
+  seekTo(e.clientX);
+  const move = ev => seekTo(ev.clientX);
+  track.addEventListener("pointermove", move);
+  track.addEventListener("pointerup", () => track.removeEventListener("pointermove", move), { once: true });
+});
+track.addEventListener("keydown", e => {
+  if (e.key === "ArrowLeft") skip(-15);
+  if (e.key === "ArrowRight") skip(30);
+});
+
+if ("mediaSession" in navigator) {
+  navigator.mediaSession.setActionHandler("play", () => audio.play());
+  navigator.mediaSession.setActionHandler("pause", () => audio.pause());
+  navigator.mediaSession.setActionHandler("seekbackward", () => skip(-15));
+  navigator.mediaSession.setActionHandler("seekforward", () => skip(30));
+}
+
+// Reading view: the email as its author wrote it (clutter removed), with its
+// links and photos, fetched on demand. While its audio plays, the paragraph
+// being spoken is highlighted and kept in view.
+const docs = new Map();
+const SIZES = [16, 18, 21, 24];
+const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let reading = null, readingDoc = null, blockEls = [], lastNow = -1, follow = true, lit = [];
+
+function setSize(px) { $("article").style.setProperty("--read", px + "px"); }
+setSize(store.get("readSize", 18));
+
+const safeUrl = url => /^(https?:|mailto:)/i.test(url || "");
+
+function renderRuns(el, runs) {
+  for (const r of runs || []) {
+    let node = document.createDocumentFragment();
+    String(r.text || "").split("\n").forEach((part, i) => {
+      if (i) node.append(document.createElement("br"));
+      if (part) node.append(document.createTextNode(part));
+    });
+    if (r.italic) { const em = document.createElement("em"); em.append(node); node = em; }
+    if (r.bold) { const b = document.createElement("strong"); b.append(node); node = b; }
+    if (r.href && safeUrl(r.href)) {
+      const a = document.createElement("a");
+      a.href = r.href; a.target = "_blank"; a.rel = "noopener noreferrer";
+      a.append(node); node = a;
+    }
+    el.append(node);
+  }
+}
+
+function renderDoc(doc) {
+  const body = $("rBody");
+  body.replaceChildren();
+  blockEls = []; lastNow = -1; lit = [];
+  let list = null, table = null;
+  const mark = (el, b) => {
+    if (typeof b.t === "number") { el.dataset.t = b.t; blockEls.push(el); }
+    if (typeof b.g === "number") el.dataset.g = b.g;
+  };
+  for (const b of doc.blocks || []) {
+    if (b.kind !== "li") list = null;
+    if (b.kind !== "row") table = null;
+    if (b.kind === "row") {
+      // A row of a data table (a market ticker, scores): numbers line up,
+      // gains in the accent colour and losses in red.
+      if (!table) {
+        const t = document.createElement("table");
+        t.className = "data";
+        table = document.createElement("tbody");
+        t.append(table);
+        body.append(t);
+      }
+      const tr = document.createElement("tr");
+      for (const cell of b.cells || []) {
+        const td = document.createElement("td");
+        const v = String(cell).trim();
+        td.textContent = v;
+        if (/^[+\-−–]?\s*[$€£]?[\d.,]+\s*(%|bps|pts?)?$/i.test(v)) {
+          td.className = "num" + (/^\+/.test(v) ? " up" : /^[-−–]/.test(v) ? " down" : "");
+        }
+        tr.append(td);
+      }
+      table.append(tr);
+      mark(tr, b);
+      continue;
+    }
+    if (b.kind === "img") {
+      if (!/^https?:/i.test(b.src || "")) continue;
+      const fig = document.createElement("figure");
+      const img = document.createElement("img");
+      img.src = b.src; img.alt = b.alt || ""; img.loading = "lazy"; img.decoding = "async";
+      img.referrerPolicy = "no-referrer";
+      img.addEventListener("error", () => fig.remove());
+      if (b.href && safeUrl(b.href)) {
+        const a = document.createElement("a");
+        a.href = b.href; a.target = "_blank"; a.rel = "noopener noreferrer";
+        a.append(img); fig.append(a);
+      } else fig.append(img);
+      body.append(fig);
+      mark(fig, b);
+      continue;
+    }
+    const el = document.createElement({ h2: "h2", h3: "h3", li: "li", quote: "blockquote" }[b.kind] || "p");
+    renderRuns(el, b.runs);
+    if (b.kind === "li") {
+      if (!list) { list = document.createElement("ul"); body.append(list); }
+      list.append(el);
+    } else body.append(el);
+    mark(el, b);
+  }
+  readingDoc = doc;
+  syncStory();
+  restorePosition();
+}
+
+// Episodes made before the reader kept formatting stored plain text.
+function textToDoc(text) {
+  return { blocks: text.split(/\n\s*\n/).filter(Boolean).map(p => ({ kind: "p", runs: [{ text: p.trim() }] })) };
+}
+
+async function openReader(ep) {
+  reading = ep; readingDoc = null; follow = true;
+  markSeen(ep);
+  render();
+  $("follow").hidden = true;
+  $("rFrom").textContent = ep.sender;
+  $("rTitle").textContent = ep.title;
+  $("rMeta").textContent = `${day(ep.published)} · ${readMinutes(ep)} min read · ~${estMinutes(ep)} min listen`;
+  syncListen();
+  const body = $("rBody");
+  const status = document.createElement("p");
+  status.className = "status";
+  status.textContent = "Loading…";
+  body.replaceChildren(status);
+  blockEls = [];
+  $("reader").hidden = false;
+  $("reader").scrollTop = 0;
+  document.body.style.overflow = "hidden";
+  if (!history.state || !history.state.reader) history.pushState({ reader: ep.id }, "");
+  try {
+    if (!docs.has(ep.id)) {
+      const res = await fetch(ep.textUrl);
+      if (!res.ok) throw new Error(res.status);
+      docs.set(ep.id, /\.json$/.test(ep.textUrl) ? await res.json() : textToDoc(await res.text()));
+    }
+    if (reading !== ep) return;
+    renderDoc(docs.get(ep.id));
+  } catch {
+    if (reading === ep) status.textContent = "Couldn't load this email. It may have expired.";
+  }
+}
+
+const readingIsLoaded = () => !!(reading && current && current.id === reading.id);
+
+function syncStory() {
+  if (!reading) return;
+  $("rBody").classList.toggle("synced", readingIsLoaded());
+  let i = -1;
+  if (readingIsLoaded() && readingDoc) {
+    // Stored times come from the voice clips; stretch them to the real file length.
+    const scale = readingDoc.total && audio.duration ? audio.duration / readingDoc.total : 1;
+    const t = audio.currentTime / scale;
+    for (let k = 0; k < blockEls.length && +blockEls[k].dataset.t <= t + 0.05; k++) i = k;
+  }
+  if (i === lastNow) return;
+  for (const el of lit) el.classList.remove("speaking");
+  lastNow = i;
+  lit = [];
+  if (i < 0) return;
+  // A sentence that stands in for a table lights up the whole table.
+  const g = blockEls[i].dataset.g;
+  lit = g === undefined ? [blockEls[i]] : [...$("rBody").querySelectorAll(`[data-g="${g}"]`)];
+  for (const el of lit) el.classList.add("speaking");
+  if (follow && !audio.paused) blockEls[i].scrollIntoView({ block: "center", behavior: calm ? "auto" : "smooth" });
+}
+
+function stopFollowing() {
+  if (!readingIsLoaded() || audio.paused || !follow) return;
+  follow = false;
+  $("follow").style.bottom = ($("bar").hidden ? 24 : $("bar").offsetHeight + 12) + "px";
+  $("follow").hidden = false;
+}
+for (const type of ["wheel", "touchmove"]) $("reader").addEventListener(type, stopFollowing, { passive: true });
+$("reader").addEventListener("keydown", e => { if (/^(Arrow|Page|Home|End| )/.test(e.key)) stopFollowing(); });
+$("follow").addEventListener("click", () => {
+  follow = true;
+  $("follow").hidden = true;
+  if (blockEls[lastNow]) blockEls[lastNow].scrollIntoView({ block: "center", behavior: calm ? "auto" : "smooth" });
+});
+
+// Tap a paragraph to jump the audio there (links still open as links).
+$("rBody").addEventListener("click", e => {
+  if (!readingIsLoaded() || e.target.closest("a")) return;
+  let el = e.target.closest("[data-t],[data-g]");
+  if (el && el.dataset.t === undefined) el = $("rBody").querySelector(`[data-g="${el.dataset.g}"][data-t]`);
+  if (!el || !readingDoc) return;
+  const scale = readingDoc.total && audio.duration ? audio.duration / readingDoc.total : 1;
+  audio.currentTime = +el.dataset.t * scale;
+  follow = true;
+  $("follow").hidden = true;
+  if (audio.paused) audio.play().catch(() => {});
+});
+audio.addEventListener("timeupdate", syncStory);
+audio.addEventListener("seeked", syncStory);
+
+function hideReader() {
+  reading = null;
+  $("follow").hidden = true;
+  $("reader").hidden = true;
+  document.body.style.overflow = "";
+}
+
+function syncListen() {
+  if (!reading) return;
+  const playingThis = current && current.id === reading.id && !audio.paused;
+  if (making.has(reading.id)) { $("rListen").textContent = "Making audio…"; $("rListen").disabled = true; }
+  else { $("rListen").textContent = playingThis ? "❚❚ Pause" : "▶ Listen"; $("rListen").disabled = false; }
+  syncStory();
+}
+
+$("rBack").addEventListener("click", () => {
+  if (history.state && history.state.reader) history.back(); else hideReader();
+});
+window.addEventListener("popstate", () => { if (!$("reader").hidden) hideReader(); });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && !$("reader").hidden && $("settings").hidden) $("rBack").click();
+});
+$("rListen").addEventListener("click", () => {
+  if (!reading) return;
+  follow = true;
+  $("follow").hidden = true;
+  if (current && current.id === reading.id) toggle(); else start(reading);  // start() voices it first if needed
+});
+$("rSize").addEventListener("click", () => {
+  const now = store.get("readSize", 18);
+  const next = SIZES[(SIZES.indexOf(now) + 1) % SIZES.length];
+  store.set("readSize", next);
+  setSize(next);
+});
+audio.addEventListener("play", syncListen);
+audio.addEventListener("pause", syncListen);
+
+// Voice an email on demand, then play it. The article comes back with its
+// paragraph timings, so the read-along works the same as for pre-made audio.
+const making = new Set();
+function notice(text) {
+  if (!reading) return;
+  let n = $("rBody").querySelector(".notice");
+  if (!text) { if (n) n.remove(); return; }
+  if (!n) { n = document.createElement("p"); n.className = "notice"; $("rBody").prepend(n); }
+  n.textContent = text;
+}
+async function makeAudio(ep) {
+  if (making.has(ep.id)) return;
+  if (reading !== ep) await openReader(ep);
+  making.add(ep.id);
+  syncListen();
+  notice("Making the audio. Long newsletters take up to 15 seconds.");
+  try {
+    const data = await callVoice("voice", { id: ep.id });
+    ep.url = data.url;
+    if (data.doc) {
+      docs.set(ep.id, data.doc);
+      if (reading === ep) renderDoc(data.doc);
+    }
+    making.delete(ep.id);
+    notice("");
+    render();
+    start(ep);
+  } catch (err) {
+    making.delete(ep.id);
+    notice(err.message);
+  }
+  syncListen();
+}
+
+// Settings: which senders are always voiced.
+let settingsData = { always: EXTRAS.always || [], senders: EXTRAS.senders || [], used: null, limit: EXTRAS.limit,
+                     voice: null, voices: [] };
+
+function renderSettings() {
+  const d = settingsData;
+  const always = new Set(d.always);
+  const people = new Map(d.senders.map(s => [s.address, s.name]));
+  for (const a of always) if (!people.has(a)) people.set(a, a);
+  const rows = [...people].sort((x, y) => (always.has(y[0]) - always.has(x[0])) || x[1].localeCompare(y[1]));
+  const list = $("sList");
+  list.replaceChildren();
+  if (!rows.length) {
+    const p = document.createElement("p");
+    p.textContent = "Senders show up here after their first email arrives.";
+    list.append(p);
+  }
+  for (const [address, name] of rows) {
+    const row = document.createElement("div");
+    row.className = "srow";
+    const who = document.createElement("div");
+    who.className = "who";
+    const b = document.createElement("b");
+    b.textContent = name;
+    const small = document.createElement("small");
+    small.textContent = address;
+    who.append(b, small);
+    const tg = document.createElement("button");
+    tg.type = "button";
+    tg.className = "tg";
+    tg.setAttribute("role", "switch");
+    tg.setAttribute("aria-checked", String(always.has(address)));
+    tg.setAttribute("aria-label", `Always voice ${name}`);
+    tg.disabled = !VOICE_URL;
+    tg.append(document.createElement("i"));
+    tg.addEventListener("click", () => flip(address));
+    row.append(who, tg);
+    list.append(row);
+  }
+  renderVoices();
+  renderSpeeds();
+  const limit = d.limit || 950000;
+  $("sLimit").textContent = `${limit.toLocaleString()} free`;
+  $("sUsed").textContent = d.used == null ? "–" : `${d.used.toLocaleString()} used`;
+  $("sMeter").style.width = d.used == null ? "0" : Math.min(100, (d.used / limit) * 100) + "%";
+}
+
+function settingsNote(text) { $("sNote").textContent = text || ""; $("sNote").hidden = !text; }
+
+async function flip(address) {
+  const before = settingsData.always.slice();
+  const on = before.includes(address);
+  settingsData.always = on ? before.filter(a => a !== address) : [...before, address];
+  renderSettings();
+  try {
+    settingsData = { ...settingsData, ...(await callVoice("settings", { always: settingsData.always })) };
+    settingsNote("");
+  } catch (err) {
+    settingsData.always = before;
+    settingsNote(err.message);
+  }
+  renderSettings();
+}
+
+async function openSettings() {
+  $("settings").hidden = false;
+  document.body.style.overflow = "hidden";
+  if (!history.state || !history.state.settings) history.pushState({ settings: true }, "");
+  await voiceReady;
+  settingsNote(VOICE_URL ? "" : "Settings can be changed once the voice function is set up (see the README).");
+  renderSettings();
+  if (!VOICE_URL) return;
+  try {
+    settingsData = { ...settingsData, ...(await callVoice("status")) };
+    renderSettings();
+  } catch (err) {
+    settingsNote(err.message);
+  }
+}
+function hideSettings() {
+  $("settings").hidden = true;
+  if ($("reader").hidden) document.body.style.overflow = "";
+}
+function closeSettings() {
+  if (history.state && history.state.settings) history.back(); else hideSettings();
+}
+$("menu").addEventListener("click", openSettings);
+$("sDone").addEventListener("click", closeSettings);
+$("sDim").addEventListener("click", closeSettings);
+window.addEventListener("popstate", () => { if (!$("settings").hidden) hideSettings(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("settings").hidden) closeSettings(); });
+
+$("copy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(FEED_URL); $("copy").textContent = "Copied"; }
+  catch { $("copy").textContent = "Select it"; }
+  setTimeout(() => { $("copy").textContent = "Copy"; }, 2000);
+});
+
+// Installable app: Chrome offers "Install" once the page qualifies; this
+// button just makes that one tap instead of a trip to the ⋮ menu.
+let installPrompt = null;
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  installPrompt = e;
+  $("install").hidden = false;
+});
+$("install").addEventListener("click", async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice.catch(() => {});
+  installPrompt = null;
+  $("install").hidden = true;
+});
+window.addEventListener("appinstalled", () => { $("install").hidden = true; });
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+
+// ---- Voice and listening speed (Settings) ----
+const sample = new Audio();
+function renderVoices() {
+  const box = $("sVoices");
+  box.replaceChildren();
+  const voices = settingsData.voices || [];
+  if (!voices.length) {
+    const p = document.createElement("p");
+    p.textContent = VOICE_URL ? "Loading voices…" : "Voices can be picked once the voice function is set up.";
+    box.append(p);
+    return;
+  }
+  for (const v of voices) {
+    const row = document.createElement("div");
+    row.className = "vrow";
+    const pick = document.createElement("button");
+    pick.type = "button";
+    pick.className = "pick";
+    pick.setAttribute("role", "radio");
+    pick.setAttribute("aria-checked", String(v.name === settingsData.voice));
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    pick.append(dot, document.createTextNode(v.label));
+    pick.addEventListener("click", () => pickVoice(v.name));
+    const hear = document.createElement("button");
+    hear.type = "button";
+    hear.className = "hear";
+    hear.textContent = "▶ Hear";
+    hear.setAttribute("aria-label", `Hear ${v.label}`);
+    hear.addEventListener("click", async () => {
+      hear.textContent = "…";
+      try {
+        const { url } = await callVoice("sample", { voice: v.name });
+        if (!audio.paused) audio.pause();
+        sample.src = url;
+        await sample.play();
+      } catch (err) { settingsNote(err.message); }
+      hear.textContent = "▶ Hear";
+    });
+    row.append(pick, hear);
+    box.append(row);
+  }
+}
+async function pickVoice(name) {
+  const before = settingsData.voice;
+  settingsData.voice = name;
+  renderVoices();
+  try {
+    settingsData = { ...settingsData, ...(await callVoice("settings", { voice: name })) };
+    settingsNote("");
+  } catch (err) {
+    settingsData.voice = before;
+    settingsNote(err.message);
+  }
+  renderVoices();
+}
+function renderSpeeds() {
+  const box = $("sSpeeds");
+  box.replaceChildren();
+  const now = store.get("speed", 1);
+  for (const sp of [0.85, 1, 1.25, 1.5, 1.75, 2]) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = sp + "×";
+    b.setAttribute("aria-pressed", String(sp === now));
+    b.addEventListener("click", () => {
+      store.set("speed", sp);
+      audio.playbackRate = sp;
+      $("speed").textContent = sp + "×";
+      renderSpeeds();
+    });
+    box.append(b);
+  }
+}
+$("sCheck").addEventListener("click", () => { closeSettings(); checkNow(); });
+
+// ---- Audio saved on this phone, so it plays with no signal ----
+const AUDIO_CACHE = "read-me-audio-v1";
+const canSave = "caches" in window;
+const full = url => new URL(url, location.href).href;
+let savedUrls = new Set();
+const isSaved = ep => savedUrls.has(full(ep.url));
+
+async function audioSource(ep) {
+  if (canSave && isSaved(ep)) {
+    try {
+      const hit = await (await caches.open(AUDIO_CACHE)).match(full(ep.url));
+      if (hit) return URL.createObjectURL(await hit.blob());
+    } catch {}
+  }
+  return ep.url;
+}
+async function saveAudio(ep) {
+  if (!canSave || !ep.url || isSaved(ep)) return;
+  try {
+    const res = await fetch(ep.url, { cache: "no-store" });
+    if (!res.ok) return;
+    await (await caches.open(AUDIO_CACHE)).put(full(ep.url), res);
+    savedUrls.add(full(ep.url));
+    render();
+  } catch {}
+}
+async function keepOffline() {
+  if (!canSave) return;
+  try {
+    const cache = await caches.open(AUDIO_CACHE);
+    const keep = new Set(visible().filter(e => e.url).map(e => full(e.url)));
+    for (const req of await cache.keys()) {
+      if (keep.has(req.url)) savedUrls.add(req.url); else await cache.delete(req);  // expired or removed
+    }
+    render();
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+    // Download unplayed audio from "always voice" senders, newest first.
+    const always = new Set((EXTRAS.always || []).map(a => a.toLowerCase()));
+    const wanted = visible().filter(e => e.url && !isSaved(e) && always.has((e.sender_address || "").toLowerCase())
+                                         && !(progress[e.id] || {}).done).slice(0, 15);
+    for (const ep of wanted) await saveAudio(ep);
+    // Articles are small: keep them all readable offline too.
+    for (const ep of visible()) if (ep.textUrl) await fetch(ep.textUrl).catch(() => {});
+  } catch {}
+}
+
+// ---- Remember where you were reading each email ----
+let positions = store.get("positions", {});
+positions = Object.fromEntries(Object.entries(positions).filter(([id]) => EPISODES.some(e => e.id === id)));
+let posTimer = 0;
+$("reader").addEventListener("scroll", () => {
+  if (!reading || !readingDoc) return;
+  clearTimeout(posTimer);
+  const id = reading.id, top = $("reader").scrollTop;
+  posTimer = setTimeout(() => { positions[id] = Math.round(top); store.set("positions", positions); }, 400);
+}, { passive: true });
+function restorePosition() {
+  if (!reading || (readingIsLoaded() && !audio.paused)) return;  // while listening, the read-along decides
+  const top = positions[reading.id];
+  if (top) $("reader").scrollTop = top;
+}
+
+// ---- Pull down on the list to check for new mail now ----
+let pullStart = null, pulled = 0, checking = false;
+const PULL = 80;
+function pullText(text, busy) {
+  $("pull").textContent = text;
+  $("pull").classList.toggle("busy", !!busy);
+}
+window.addEventListener("touchstart", e => {
+  if (checking || !$("reader").hidden || !$("settings").hidden || window.scrollY > 0) return;
+  pullStart = e.touches[0].clientY;
+  pulled = 0;
+}, { passive: true });
+window.addEventListener("touchmove", e => {
+  if (pullStart === null) return;
+  pulled = e.touches[0].clientY - pullStart;
+  $("pull").style.height = Math.max(0, Math.min(pulled, 120)) * 0.5 + "px";
+  $("pull").textContent = pulled > PULL ? "Release to check for new mail" : "Pull to check for new mail";
+}, { passive: true });
+window.addEventListener("touchend", () => {
+  if (pullStart === null) return;
+  pullStart = null;
+  $("pull").style.height = "";
+  if (pulled > PULL) checkNow(); else pullText("");
+});
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function checkNow() {
+  if (checking) return;
+  checking = true;
+  pullText("Checking for new mail…", true);
+  try {
+    const started = await callVoice("check");
+    const since = new Date(started.at).getTime() - 15000;
+    for (let i = 0; i < 30; i++) {  // a run takes about a minute; give up after five
+      await sleep(10000);
+      const st = await callVoice("checkstatus");
+      if (!st.created || new Date(st.created).getTime() < since || st.status !== "completed") continue;
+      if (st.conclusion === "success") {
+        pullText("Up to date. Loading…", true);
+        location.reload();
+        return;
+      }
+      throw new Error("The check ran into a problem. Details are in GitHub → Actions.");
+    }
+    throw new Error("Still checking. New emails will show up when it's done.");
+  } catch (err) {
+    pullText(err.message, true);
+    setTimeout(() => pullText(""), 6000);
+  }
+  checking = false;
+}
+
+render();
+keepOffline();
+</script>
+</body>
+</html>
