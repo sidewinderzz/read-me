@@ -152,3 +152,57 @@ def test_check_now_says_when_it_is_not_set_up(monkeypatch):
     with pytest.raises(fn.Refused) as err:
         fn.check_now(_store(), now=NOW)
     assert err.value.code == 501
+
+
+def _github_calls():
+    calls = []
+
+    def github(method, path, body=None):
+        calls.append((method, path, body))
+        return {}
+
+    return calls, github
+
+
+def test_add_shared_link_saves_it_and_starts_a_run_even_right_after_one():
+    store = FakeStore()
+    store.files["checked.json"] = json.dumps({"at": NOW.isoformat()})  # a check just happened
+    calls, github = _github_calls()
+    out = fn.add_shared(store, {"title": "Storm", "url": "https://news.example.com/rain"}, now=NOW, github=github)
+    meta = json.loads(store.files[f"inbox/{out['added']}.json"])
+    assert meta["url"] == "https://news.example.com/rain" and meta["title"] == "Storm"
+    assert out["checking"] is True and calls[0][0] == "POST"
+
+
+def test_add_shared_file():
+    import base64
+
+    store = FakeStore()
+    calls, github = _github_calls()
+    data = base64.b64encode(b"%PDF-1.4 hi").decode()
+    out = fn.add_shared(store, {"file": {"name": "notice.pdf", "type": "application/pdf", "data": data}},
+                        now=NOW, github=github)
+    assert store.files[f"inbox/{out['added']}.bin"] == b"%PDF-1.4 hi"
+    meta = json.loads(store.files[f"inbox/{out['added']}.json"])
+    assert meta["filename"] == "notice.pdf" and meta["content_type"] == "application/pdf"
+
+
+@pytest.mark.parametrize("body, code", [
+    ({}, 400),
+    ({"file": "x"}, 400),
+    ({"file": {"name": "photo.jpg", "type": "image/jpeg", "data": "aGk="}}, 415),
+    ({"file": {"name": "a.pdf", "data": "not base64!"}}, 400),
+    ({"file": {"name": "a.pdf", "data": ""}}, 413),
+])
+def test_add_shared_refuses_bad_input(body, code):
+    store = FakeStore()
+    with pytest.raises(fn.Refused) as err:
+        fn.add_shared(store, body, now=NOW, github=_github_calls()[1])
+    assert err.value.code == code and not store.files
+
+
+def test_add_shared_without_check_now_set_up_still_saves(monkeypatch):
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+    store = FakeStore()
+    out = fn.add_shared(store, {"text": "some words to read"}, now=NOW)
+    assert out["checking"] is False and f"inbox/{out['added']}.json" in store.files

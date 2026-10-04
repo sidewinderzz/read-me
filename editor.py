@@ -15,6 +15,8 @@ from pathlib import Path
 import anthropic
 
 import article
+import documents
+import inbox
 from mail import Email, clean_subject
 
 # Haiku is the cheapest Claude model and plenty for sorting blocks: well
@@ -50,6 +52,57 @@ class Edits:
 class Article:
     intro: str  # spoken before the first block, e.g. "From Morning Brew. Cha-Cha Slide."
     blocks: list[article.Block]
+    title: str = ""  # set when it isn't the email's subject (a linked page, a shared file)
+    source: str = ""  # set when it isn't the sender (the website a link came from)
+
+
+# Phone and mail-app sign-offs that don't count as a real message.
+_SIGNOFF = re.compile(r"^(sent from my \w+|get outlook for \w+|sent via \w+|shared (from|via) \w+)", re.I)
+
+
+def gather(mail: Email, fetch=documents.fetch_page) -> tuple[list[article.Block], str, str]:
+    """All the blocks for one email: its own text, the page it links to (if
+    it's basically just a link), and any readable attachments. Also returns a
+    title and source when those should replace the subject and sender."""
+    body = article.extract(mail.html, mail.text)
+    title = source = ""
+
+    def says_something(block):
+        words = documents._URL.sub(" ", article.spoken_text(block) or "").split()
+        return len(words) >= 3 and not _SIGNOFF.match(" ".join(words))
+
+    # Keep the email's own text whole if it says anything; drop it if it's
+    # only a sign-off or the bare link.
+    note = body if any(says_something(b) for b in body) else []
+    extra: list[article.Block] = []
+
+    link = None if mail.attachments else documents.lone_link(mail.text, mail.subject)
+    if link:
+        try:
+            page = fetch(link)
+            extra += page.blocks
+            title, source = page.title, page.site
+        except documents.DocumentError as exc:
+            extra.append(article.Block("p", [article.Run(f"This link couldn't be read: {exc}")]))
+
+    for att in mail.attachments:
+        name = att.filename or "Attachment"
+        try:
+            doc = documents.file_blocks(att)
+        except documents.DocumentError as exc:
+            doc = [article.Block("p", [article.Run(str(exc))])]
+        if note or extra or len(mail.attachments) > 1:
+            extra.append(article.Block("h2", [article.Run(f"📎 {name}")]))
+        elif not title:
+            title = documents.title_from_filename(name)
+        extra += doc
+
+    if not extra:
+        return body, "", ""
+    return (note + extra)[:documents.MAX_BLOCKS], title, source
+
+
+
 
 
 def make_client() -> anthropic.Anthropic:
@@ -62,7 +115,7 @@ def make_client() -> anthropic.Anthropic:
 def edit(mail: Email, client: anthropic.Anthropic | None = None) -> Article | None:
     """The email with its clutter removed, or None when it isn't worth reading
     at all (verification codes, confirm-your-email requests and the like)."""
-    blocks = article.extract(mail.html, mail.text)
+    blocks, title, source = gather(mail)
     if not blocks:
         raise EditError("This email has no readable content.")
 
@@ -82,7 +135,7 @@ def edit(mail: Email, client: anthropic.Anthropic | None = None) -> Article | No
     kept = apply(blocks, edits)
     if not any(article.spoken_text(b) for b in kept):
         raise EditError("Nothing was left to read after removing the clutter.")
-    return Article(intro=spoken_intro(mail), blocks=kept)
+    return Article(intro=spoken_intro(mail, title, source), blocks=kept, title=title, source=source)
 
 
 def parse_reply(reply: str, count: int) -> Edits | None:
@@ -135,11 +188,13 @@ def _numbers(spec: str, count: int) -> set[int]:
     return found
 
 
-def spoken_intro(mail: Email) -> str:
-    title = clean_subject(mail.subject)
+def spoken_intro(mail: Email, title: str = "", source: str = "") -> str:
+    title = title or clean_subject(mail.subject)
     # Emoji in subject lines get read out as their names ("hot beverage"), so drop them.
     title = re.sub(r"[\U0001F000-\U0001FAFF☀-➿️‍]", "", title).strip()
-    return f"From {mail.sender}. {title}."
+    if not source and mail.message_id.startswith(inbox.PREFIX):
+        return f"{title}."  # something you shared yourself: no "From Shared."
+    return f"From {source or mail.sender}. {title}."
 
 
 def _ask(client: anthropic.Anthropic, content: str) -> str:

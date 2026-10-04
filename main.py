@@ -17,18 +17,30 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 
 import article
 import editor
+import inbox
 import mail
 import podcast
 import store as storage
 import voice
 
 GIVE_UP_AFTER = 3  # failed attempts before an email is skipped for good
+DUPLICATE_WINDOW = timedelta(days=2)  # the same newsletter arriving twice, this far apart, is one email
+
+
+def content_key(m) -> str:
+    """Same sender, subject and opening text means the same email, even when it
+    arrived twice under different Message-IDs (e.g. subscribed with and without
+    the +readme address)."""
+    subject = re.sub(r"\W+", " ", mail.clean_subject(m.subject).lower()).strip()
+    opening = re.sub(r"\W+", "", m.text.lower())[:400]
+    return hashlib.sha1(f"{m.sender_address}|{subject}|{opening}".encode()).hexdigest()
 
 
 def setting(name: str, default: str = "") -> str:
@@ -59,10 +71,25 @@ def run(fetch, edit, speak, store, *, now: datetime, max_emails: int,
         return not (entry.get("status") in ("done", "not_worth_reading")
                     or entry.get("attempts", 0) >= GIVE_UP_AFTER)
 
-    todo = [m for m in fetch() if waiting(m)][:max_emails]
+    def seen_recently(m):
+        if m.message_id.startswith(inbox.PREFIX) or not m.sender_address:
+            return False
+        key = content_key(m)
+        for other_id, entry in processed.items():
+            if other_id != m.message_id and entry.get("key") == key and entry.get("status") == "done":
+                if now - datetime.fromisoformat(entry["at"]) < DUPLICATE_WINDOW:
+                    return True
+        return False
+
+    arrived = fetch()
+    todo = [m for m in arrived if waiting(m)][:max_emails]
     print(f"{len(todo)} new email(s) to read.")
 
     for m in todo:
+        if seen_recently(m):
+            processed[m.message_id] = {"status": "done", "at": now.isoformat(), "duplicate": True}
+            print(f"  Skipped '{m.subject}': a copy of it was already read.")
+            continue
         try:
             piece = edit(m)
             if piece is None:
@@ -108,8 +135,8 @@ def run(fetch, edit, speak, store, *, now: datetime, max_emails: int,
         store.write(text_path, json.dumps(doc), "application/json")  # updated later if voiced from the app
         state["episodes"].append(asdict(podcast.Episode(
             id=episode_id,
-            title=mail.clean_subject(m.subject),
-            sender=m.sender,
+            title=piece.title or mail.clean_subject(m.subject),
+            sender=piece.source or m.sender,
             published=now.isoformat(),
             audio=audio_path,
             bytes=len(audio),
@@ -119,11 +146,16 @@ def run(fetch, edit, speak, store, *, now: datetime, max_emails: int,
         )))
         if m.sender_address:
             state["senders"][m.sender_address] = {"name": m.sender, "last": now.isoformat()}
-        processed[m.message_id] = {"status": "done", "at": now.isoformat()}
+        processed[m.message_id] = {"status": "done", "at": now.isoformat(), "key": content_key(m)}
         podcast.publish(store, state, title)
         summary["read"] += 1
         print(f"  Ready: '{m.subject}' ({len(piece.blocks)} blocks, "
               f"{'voiced' if audio else 'voice on demand'}).")
+
+    # Shared items are finished with once read (or given up on).
+    for m in arrived:
+        if m.message_id.startswith(inbox.PREFIX) and not waiting(m):
+            inbox.remove(store, m.message_id)
 
     pruned = _forget_old(state, now, keep_days, store, always)
     # Quiet hours write nothing, which keeps storage operations in the free tier.
@@ -240,7 +272,7 @@ def main() -> int:
 
     store = storage.Bucket(setting("GCS_BUCKET"), setting("FEED_SECRET"))
     summary = run(
-        fetch,
+        lambda: fetch() + inbox.items(store),
         editor.edit,
         lambda said: voice.synthesize(said, voice_name=storage.voice_choice(store)),
         store,

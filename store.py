@@ -7,6 +7,8 @@ state that both the hourly run and the on-demand voice function read.
                                add it to the feed (written by the voice function)
     <secret>/removed/<id>.json emails swiped away in the app, waiting for the
                                hourly run to delete them (written by the voice function)
+    <secret>/inbox/<id>.*      text, links and files shared to the app, waiting for
+                               the next run (written by the voice function)
 
 Keeping those writers on separate files means the hourly run and the voice
 function never overwrite each other's changes.
@@ -34,6 +36,10 @@ class Bucket:
         if not blob.exists():
             return None
         return json.loads(blob.download_as_text())
+
+    def read_bytes(self, name: str) -> bytes | None:
+        blob = self._bucket.blob(self._path(name))
+        return blob.download_as_bytes() if blob.exists() else None
 
     def write(self, name: str, data: bytes | str, content_type: str, cache: bool = False) -> None:
         blob = self._bucket.blob(self._path(name))

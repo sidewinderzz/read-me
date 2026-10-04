@@ -109,3 +109,77 @@ def test_workspace_header_added_when_set(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
     monkeypatch.setenv("ANTHROPIC_WORKSPACE_ID", "wrkspc_123")
     assert editor.make_client().default_headers.get("anthropic-workspace-id") == "wrkspc_123"
+
+
+# --- links and attachments ------------------------------------------------------
+
+import documents  # noqa: E402
+from article import Block, Run  # noqa: E402
+from documents import Attachment  # noqa: E402
+
+PDF = (__import__("pathlib").Path(__file__).parent / "fixtures" / "notice.pdf").read_bytes()
+
+
+def _plain(text, subject="Fwd: something", attachments=None):
+    return Email("<2@x>", "Me", subject, datetime(2026, 9, 26, tzinfo=timezone.utc), text, "",
+                 attachments=attachments)
+
+
+def _fetch(url):
+    return documents.Page("Rain on the way", "Valley News", [Block("p", [Run(f"Story from {url}.")])])
+
+
+def test_a_bare_link_becomes_the_page():
+    blocks, title, source = editor.gather(_plain("https://news.example.com/rain\n\nSent from my Pixel"), _fetch)
+    assert [b.text for b in blocks] == ["Story from https://news.example.com/rain."]
+    assert (title, source) == ("Rain on the way", "Valley News")
+
+
+def test_a_link_with_a_note_keeps_the_note():
+    blocks, _, _ = editor.gather(_plain("Dad, read this one about the storm. https://news.example.com/rain"), _fetch)
+    assert blocks[0].text.startswith("Dad, read this one") and blocks[-1].text.startswith("Story from")
+
+
+def test_a_link_that_fails_says_so():
+    def fail(url):
+        raise documents.DocumentError("That page didn't have any readable text (it may need a login).")
+
+    blocks, title, _ = editor.gather(_plain("https://paywall.example.com/x"), fail)
+    assert blocks[-1].text.startswith("This link couldn't be read: That page didn't") and title == ""
+
+
+def test_a_pdf_alone_is_titled_from_its_filename():
+    mail = _plain("", attachments=[Attachment("water_notice.pdf", "application/pdf", PDF)])
+    blocks, title, source = editor.gather(mail, _fetch)
+    assert title == "water notice" and source == ""
+    assert blocks[0].text == "Irrigation District Notice"
+
+
+def test_a_pdf_with_a_note_gets_a_heading_and_ignores_links_in_the_note():
+    mail = _plain("Here's the notice, see https://district.example.com",
+                  attachments=[Attachment("notice.pdf", "application/pdf", PDF)])
+    blocks, title, _ = editor.gather(mail, lambda url: pytest.fail("shouldn't fetch"))
+    assert blocks[0].text.startswith("Here's the notice") and blocks[1].text == "📎 notice.pdf"
+    assert blocks[2].text == "Irrigation District Notice" and title == ""
+
+
+def test_a_scanned_or_broken_file_explains_why():
+    mail = _plain("", attachments=[Attachment("scan.pdf", "application/pdf", b"%PDF-1.4 broken")])
+    blocks, title, _ = editor.gather(mail, _fetch)
+    assert "couldn't be opened" in blocks[0].text and title == "scan"
+
+
+def test_plain_email_is_unchanged():
+    blocks, title, source = editor.gather(_mail(), _fetch)
+    assert len(blocks) == 4 and (title, source) == ("", "")
+
+
+def test_intro_uses_page_title_and_site():
+    mail = _plain("https://x.com")
+    assert editor.spoken_intro(mail, "Rain on the way", "Valley News") == "From Valley News. Rain on the way."
+
+
+def test_intro_for_something_you_shared_is_just_the_title():
+    mail = Email("shared:ab12", "Shared", "notice.pdf", datetime(2026, 9, 26, tzinfo=timezone.utc), "")
+    assert editor.spoken_intro(mail, "water notice") == "water notice."
+    assert editor.spoken_intro(mail, "Rain", "Valley News") == "From Valley News. Rain."

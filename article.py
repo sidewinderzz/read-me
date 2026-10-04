@@ -10,6 +10,7 @@ email's own HTML.
 
 import re
 from dataclasses import dataclass, field
+from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 
@@ -56,11 +57,11 @@ class Block:
         return "".join(r.text for r in self.runs).strip()
 
 
-def extract(html: str | None, plain: str = "") -> list[Block]:
+def extract(html: str | None, plain: str = "", base_url: str = "") -> list[Block]:
     """Blocks in reading order. Falls back to the plain-text part when the
-    email has no HTML."""
+    email has no HTML. base_url resolves relative links and images (web pages)."""
     if html and html.strip():
-        blocks = _from_html(html)
+        blocks = _from_html(html, base_url)
         if any(b.text for b in blocks):
             return blocks
     return _from_plain(plain)
@@ -129,7 +130,8 @@ def to_json(blocks: list[Block]) -> list[dict]:
 # --- HTML -------------------------------------------------------------------
 
 class _Walker:
-    def __init__(self):
+    def __init__(self, base_url: str = ""):
+        self.base_url = base_url
         self.blocks: list[Block] = []
         self.runs: list[Run] = []
         self.kind = "p"
@@ -160,7 +162,8 @@ class _Walker:
                 self.walk(child, href, bold, italic, _block_kind(name, kind))
                 self.flush()
             elif name == "a":
-                link = _safe_href(child.get("href", ""))
+                raw = (child.get("href") or "").strip()
+                link = _safe_href(urljoin(self.base_url, raw) if self.base_url and raw and not raw.startswith("#") else raw)
                 self.walk(child, link or href, bold, italic, kind)
             elif name in ("b", "strong") or _is_bold(child):
                 self.walk(child, href, True, italic, kind)
@@ -184,7 +187,9 @@ class _Walker:
         return True
 
     def image(self, tag: Tag, href: str):
-        src = (tag.get("src") or "").strip()
+        src = (tag.get("src") or tag.get("data-src") or "").strip()
+        if self.base_url and src:
+            src = urljoin(self.base_url, src)
         if not src.startswith(("https://", "http://")) or _TRACKER.search(src):
             return
         width, height = _size(tag.get("width")), _size(tag.get("height"))
@@ -213,10 +218,10 @@ class _Walker:
         self.blocks.append(Block(kind, runs))
 
 
-def _from_html(html: str) -> list[Block]:
+def _from_html(html: str, base_url: str = "") -> list[Block]:
     soup = BeautifulSoup(html, "html.parser")
     root = soup.body or soup
-    walker = _Walker()
+    walker = _Walker(base_url)
     walker.walk(root)
     walker.flush()
     return walker.blocks

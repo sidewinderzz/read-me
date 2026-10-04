@@ -7,6 +7,8 @@ REMOVE blocks that are:
 - Footers: unsubscribe and preference links, mailing addresses, copyright, legal boilerplate, "You're receiving this because…", and lists of the publisher's other newsletters.
 - For a forwarded email, the "Forwarded message" header lines (From:, Date:, Subject:, To:). Keep any note the forwarder wrote above it.
 
+The blocks may also come from a web page the email linked to, or from an attached document (a PDF, Word file or text file). For web pages, also remove site menus, cookie and "subscribe" prompts, share buttons, "related stories" lists and comment sections. For documents, keep everything except leftover page furniture (repeated headers, page numbers): the reader asked for that document.
+
 Keep everything that's part of the actual content: headlines, every paragraph of the stories, lists, quotes, images and charts that go with the stories, captions, and links inside the stories. When unsure, keep it.
 
 QUIET blocks stay on screen but aren't read aloud: bylines and lists of author names, photo and illustration credits, "Data is provided by", footnotes and other small print.

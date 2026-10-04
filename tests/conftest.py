@@ -16,6 +16,10 @@ class FakeStore:
     def list(self, prefix):
         return sorted(name for name in self.files if name.startswith(prefix))
 
+    def read_bytes(self, name):
+        data = self.files.get(name)
+        return data.encode() if isinstance(data, str) else data
+
     def read_json(self, name):
         return json.loads(self.files[name]) if name in self.files else None
 
