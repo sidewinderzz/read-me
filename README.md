@@ -1,5 +1,7 @@
 # Read Me
 
+![Read Me: newsletters, out loud](docs/hero.png)
+
 Forward an email to `you+readme@gmail.com`, subscribe to newsletters with that address, or label an email **ReadMe** in Gmail, and within the hour it shows up in the Read Me app and your podcast feed, read by a natural voice. Nothing is rewritten: Claude only acts as an editor that cuts the clutter (footers, ads, "view in browser"), so you hear and read the author's own words. The reader keeps the links, photos and formatting, and highlights each paragraph as it's read so you can follow along.
 
 ```
@@ -7,15 +9,6 @@ Gmail ─▶ Claude Haiku (marks the clutter to cut) ─▶ Google voice, one cl
 ```
 
 It runs on GitHub Actions every hour. There's no server to keep running, and everything fits in free tiers except Claude, which costs well under a cent per email.
-
-## Make your own copy (keep it private)
-
-Everyone runs their own copy with their own Gmail, Claude key and Google account; nothing is shared with anyone else.
-
-1. Click **Use this template → Create a new repository** (or fork it), and choose **Private**.
-2. Follow the setup below.
-
-**Keep your copy private.** GitHub shows a public repository's run logs to everyone, and those logs include your app's private link (and the subject lines of your emails). Anyone with that link can read your emails.
 
 ## What it costs
 
@@ -108,29 +101,41 @@ Optional variables:
 1. Label an email **ReadMe**.
 2. Go to the **Actions** tab → **Read my emails** → **Run workflow**.
 3. Open the finished run. The last lines of the log print two links:
-   - **Player page**: open it in Chrome on your phone and tap **Install** (top right of the page, or ⋮ → *Install app*). It lands in your app drawer and opens full screen like any other app, and still shows the last list when you're out of signal. Tap an email to read it, like an inbox. Swipe an email right to remove it (there's an Undo for 5 seconds): it disappears on your phone right away, and once the voice function is set up the next hourly run deletes it and its audio for good. Tap **▶ Listen** at the top of the email to hear it: the player comes up at the bottom and the paragraph being read is highlighted as the page scrolls along (the **Aa** button changes the text size).
+   - **Player page**: open it in Chrome on your phone and tap **Install** (top right of the page, or ⋮ → *Install app*). It lands in your app drawer and opens full screen like any other app, and still shows the last list when you're out of signal. Tap an email to read it, like an inbox. Swipe an email right to remove it (there's an Undo for 5 seconds): it disappears on your phone right away, and once the voice function is set up the next scheduled run deletes it and its audio for good. Tap **▶ Listen** at the top of the email to hear it: the player comes up at the bottom and the paragraph being read is highlighted as the page scrolls along (the **Aa** button changes the text size).
    - **Podcast feed**: in your podcast app, choose "add show by URL" and paste it. In Apple Podcasts on iPhone it's Library → ⋯ → Follow a Show by URL. Pocket Casts, Overcast and AntennaPod have the same option.
 
 After that it runs by itself every hour. If an email can't be read, GitHub emails you about the failed run. That email is retried up to 3 times.
+
+## PDFs, documents, links and sharing
+
+Read Me isn't only for newsletters:
+
+- **Attachments:** PDFs, Word documents (.docx), text and Markdown files, and saved web pages (.html) attached to an email are read along with it. Forward a PDF by itself and it becomes its own article, named after the file.
+- **Links:** forward (or share) something that's just a link, maybe with a short note, and Read Me fetches the page and reads the article, not the menus around it. A link straight to a PDF is read as a PDF.
+- **Share from any app:** once Read Me is installed on your phone, it shows up in Android's **Share** menu. Share a PDF from WhatsApp, a page from Chrome, or text from anywhere, and it's added and read within about a minute. You can also paste a link or pick a file in **⋮ → Settings → Add a link or file**.
+
+Sharing needs the voice function (next section) and the `READ_ME_GITHUB_TOKEN` secret so it can start a run right away; without the token, shared items wait for the next scheduled run. If you installed the app before this feature existed, remove it from your home screen and install it again so Android adds it to the Share menu.
+
+Limits: a **scanned PDF** (photos of pages, common from phone scanner apps) has no text in it, so Read Me says so instead of reading it. Pages behind a login or paywall can't be fetched. Shared files can be up to 15 MB.
 
 ## Always voice, or voice when you tap Listen
 
 Every email is ready to **read** within the hour. Audio is made two ways:
 
-- **Always voice:** senders you switch on in the app (**⋮ → Settings**) get audio as soon as their emails arrive, so it's ready offline and in your podcast app. Nothing is switched on at first; to start with some, set the `ALWAYS_VOICE` variable to a comma-separated list of sender addresses.
-- **On demand:** everything else is voiced when you tap **Listen** in the app: it takes a few seconds, and the audio is saved so replays are instant. Those emails join the podcast feed on the next hourly run.
+- **Always voice:** senders you switch on in the app (**⋮ → Settings**) get audio as soon as their emails arrive, so it's ready offline and in your podcast app. Set the starting list with the `ALWAYS_VOICE` variable (comma-separated sender addresses).
+- **On demand:** everything else is voiced when you tap **Listen** in the app: it takes a few seconds, and the audio is saved so replays are instant. Those emails join the podcast feed on the next scheduled run.
 
 On-demand audio and the settings switches use a small Google Cloud function. One-time setup:
 
 1. In Google Cloud (same project), enable **Cloud Functions API**, **Cloud Run Admin API**, **Cloud Build API** and **Artifact Registry API**.
-2. IAM: give the `read-me` service account the roles **Cloud Functions Admin**, **Cloud Run Admin** and **Service Account User**. Give the **Compute Engine default service account** the role **Cloud Build Service Account** (it builds the function).
+2. IAM: give the `read-aloud` service account the roles **Cloud Functions Admin**, **Cloud Run Admin** and **Service Account User**. Give the **Compute Engine default service account** the role **Cloud Build Service Account** (it builds the function).
 3. GitHub → Settings → Secrets and variables → Actions → Variables: add `VOICE_FUNCTION` = `on`.
 4. For **pull down to check for new mail**: on GitHub, go to your profile picture → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token. Name it "Read Me check", set an expiration (a year is fine), choose **Only select repositories →** your copy of this repo, and under Repository permissions set **Actions: Read and write**. Save the token as a repository secret named `READ_ME_GITHUB_TOKEN`.
 5. Actions → **Deploy voice function** → Run workflow. When it's green, Listen, Settings and check-for-mail work in the app. It redeploys itself whenever the code changes.
 
 In the app:
 
-- **Pull down** on the list (or ⋮ → Settings → Check for new mail now) to look for new mail right away instead of waiting for the hourly run. The list reloads by itself about a minute later.
+- **Pull down** on the list (or ⋮ → Settings → Check for new mail now) to look for new mail right away instead of waiting for the scheduled run. The list reloads by itself about a minute later.
 - **Audio is saved on your phone.** Emails from "always voice" senders download when you open the app, and anything you start listening to is saved too, so it plays with no signal. Saved emails say **saved** in the list.
 - **⋮ → Settings** also has the **voice** (with a sample of each) for new audio, and your usual **listening speed**.
 - Each email reopens **where you left off reading**.
@@ -162,6 +167,8 @@ To change any of this, edit **`prompt.md`**: it's the plain-English instructions
 | Gmail login fails | Use an app password, not your normal password; 2-Step Verification must be on. |
 | An old email I labeled isn't read | Only emails *received* in the last 7 days are checked. Forward it to your `+readme` address instead, or raise `LOOKBACK_DAYS`. |
 | Google error mentioning `texttospeech` / "API has not been used" | Enable **Cloud Text-to-Speech API** in the same project as the service account. |
+| Read Me isn't in the Share menu | Reinstall the app from Chrome (⋮ → Add to Home screen / Install app) so it picks up the share setting. Sharing also needs the voice function deployed. |
+| A shared PDF says it's a scan | It's pictures of pages with no text layer. Run it through a scanner app's "recognize text" (OCR) option first, then share it again. |
 | Podcast app says the feed can't be loaded | Check step 3.5 (`allUsers` → Storage Legacy Object Reader) and that public access prevention is off. |
 
 ## Files
@@ -169,17 +176,15 @@ To change any of this, edit **`prompt.md`**: it's the plain-English instructions
 | File | What it does |
 |---|---|
 | `main.py` | runs everything; `python main.py --dry-run` prints what would be read without making audio |
-| `mail.py` | fetches labeled emails from Gmail and pulls out the text |
+| `mail.py` | fetches labeled emails from Gmail and pulls out the text and attachments |
+| `documents.py` | reads PDFs, Word and text files, and fetches web pages from links |
+| `inbox.py` | picks up things shared from the phone so they're read like emails |
 | `article.py` | turns an email's HTML into clean blocks: headings, paragraphs, lists, photos and links |
 | `editor.py` + `prompt.md` | Claude marks which blocks are clutter; nothing is rewritten |
 | `voice.py` | Google voices each paragraph and times it, for the read-along highlight |
 | `podcast.py` | uploads MP3s and text, builds the podcast feed and player page |
 | `player.html` | the Read Me app (ledger theme): listen, read along with photos and links, and ⋮ Settings |
-| `function/main.py` | the on-demand voice function the app calls (Listen, Settings) |
+| `function/main.py` | the on-demand voice function the app calls (Listen, Settings, sharing, check now) |
 | `store.py` | shared access to the storage bucket, settings and the monthly allowance |
 | `sw.js`, `icons/` | make the player page installable as an app |
 | `.github/workflows/read-emails.yml` | the hourly schedule |
-
-## License
-
-MIT. See [LICENSE](LICENSE).

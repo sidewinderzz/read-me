@@ -20,6 +20,10 @@ from email import policy
 
 from bs4 import BeautifulSoup
 
+from documents import Attachment, kind_of
+
+MAX_ATTACHMENTS = 5
+
 IMAP_HOST = "imap.gmail.com"
 
 # Lines like these only make sense on a screen; dropping them before Claude sees
@@ -41,6 +45,11 @@ class Email:
     text: str  # readable plain text
     html: str = ""  # the original HTML part, for the reading view
     sender_address: str = ""  # lower-case email address, for the "always voice" list
+    attachments: list = None  # PDFs, Word docs, text and HTML files (documents.Attachment)
+
+    def __post_init__(self):
+        if self.attachments is None:
+            self.attachments = []
 
 
 def reading_address(address: str) -> str:
@@ -128,7 +137,23 @@ def parse_message(raw: bytes) -> Email:
     html_part = msg.get_body(preferencelist=("html",))
     html = html_part.get_content() if html_part is not None else ""
     return Email(message_id=message_id, sender=sender, subject=subject, date=date,
-                 text=text, html=html, sender_address=address)
+                 text=text, html=html, sender_address=address, attachments=attachments_of(msg))
+
+
+def attachments_of(msg) -> list[Attachment]:
+    """Attached files Read Me can read (PDF, Word, text, Markdown, HTML)."""
+    found = []
+    for part in msg.iter_attachments():
+        filename = part.get_filename() or ""
+        kind = kind_of(filename, part.get_content_type())
+        if not kind:
+            continue
+        data = part.get_payload(decode=True) or b""
+        if data:
+            found.append(Attachment(filename or "Attachment", kind, data))
+        if len(found) >= MAX_ATTACHMENTS:
+            break
+    return found
 
 
 def clean_subject(subject: str) -> str:

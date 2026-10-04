@@ -10,10 +10,26 @@ self.addEventListener("activate", event => event.waitUntil(
     .then(() => self.clients.claim())
 ));
 
+// Something shared to Read Me from the phone's share menu arrives here as a
+// form post. Keep it for the page, which uploads it, then open the app.
+const SHARE_CACHE = "read-me-share";
+async function receiveShare(request, scope) {
+  try {
+    const form = await request.formData();
+    const cache = await caches.open(SHARE_CACHE);
+    await cache.put(new URL("shared-pending", scope).href, new Response(form));
+  } catch {}
+  return Response.redirect(new URL("index.html?shared=1", scope).href, 303);
+}
+
 self.addEventListener("fetch", event => {
   const request = event.request;
   const url = new URL(request.url);
   const scope = new URL(self.registration.scope);
+  if (request.method === "POST" && url.origin === scope.origin && url.pathname === scope.pathname + "share") {
+    event.respondWith(receiveShare(request, scope));
+    return;
+  }
   if (request.method !== "GET" || url.origin !== scope.origin || !url.pathname.startsWith(scope.pathname)) return;
   if (url.pathname.endsWith(".mp3")) return;
 

@@ -10,6 +10,7 @@ on:
     paths:
       - "function/**"
       - "article.py"
+      - "documents.py"
       - "voice.py"
       - "store.py"
       - ".github/workflows/deploy-voice.yml"
@@ -49,7 +50,7 @@ jobs:
           REGION: us-central1
         run: |
           mkdir -p build
-          cp function/main.py function/requirements.txt article.py voice.py store.py build/
+          cp function/main.py function/requirements.txt article.py documents.py voice.py store.py build/
           python3 - <<'PY'
           import json, os
           names = ["GCS_BUCKET", "FEED_SECRET", "MONTHLY_CHAR_LIMIT", "ALWAYS_VOICE", "TTS_VOICE",

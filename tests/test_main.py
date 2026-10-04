@@ -219,3 +219,60 @@ def test_swiped_away_emails_are_deleted_on_the_next_run():
     assert first["audio"] not in store.files and first["text"] not in store.files
     assert not any(n.startswith("removed/") for n in store.files)
     assert "Letter 1" not in store.files["feed.xml"] and "Letter 2" in store.files["feed.xml"]
+
+
+def test_shared_items_are_read_and_then_cleared():
+    import inbox
+
+    store = _store()
+    store.files["inbox/aa11.json"] = json.dumps({"id": "aa11", "title": "", "text": "Read this later please, it is good.",
+                                                  "url": "", "at": NOW.isoformat()})
+    store.files["inbox/bb22.json"] = json.dumps({"id": "bb22", "title": "", "text": "", "url": "",
+                                                  "filename": "notice.pdf", "content_type": "application/pdf",
+                                                  "at": NOW.isoformat()})
+    store.files["inbox/bb22.bin"] = b"%PDF-data"
+    shared = inbox.items(store)
+    assert [(m.message_id, m.subject, m.sender) for m in shared] == [
+        ("shared:aa11", "Read this later please, it is good.", "Shared"), ("shared:bb22", "notice.pdf", "Shared")]
+    assert shared[1].attachments[0].data == b"%PDF-data"
+
+    def edit(m):
+        piece = _article(m)
+        piece.title = "Water notice" if m.attachments else ""
+        return piece
+
+    summary = main.run(lambda: inbox.items(store), edit, _speak, store, now=NOW, max_emails=10,
+                       monthly_char_limit=950_000, keep_days=30, title="Read Me")
+    assert summary["read"] == 2
+    assert not [n for n in store.files if n.startswith("inbox/")]
+    titles = sorted(e["title"] for e in _state(store)["episodes"])
+    assert titles == ["Read this later please, it is good.", "Water notice"]
+
+
+def test_a_shared_item_that_keeps_failing_is_cleared_after_giving_up():
+    import inbox
+
+    store = _store()
+    store.files["inbox/cc33.json"] = json.dumps({"id": "cc33", "text": "hello there friend", "at": NOW.isoformat()})
+
+    def broken(m):
+        raise editor.EditError("nope")
+
+    for _ in range(main.GIVE_UP_AFTER):
+        assert "inbox/cc33.json" in store.files
+        main.run(lambda: inbox.items(store), broken, _speak, store, now=NOW, max_emails=10,
+                 monthly_char_limit=950_000, keep_days=30, title="Read Me")
+    assert "inbox/cc33.json" not in store.files
+
+
+def test_same_newsletter_arriving_twice_is_read_once():
+    store = _store()
+    first = _mail(1, subject="Daily Brief")
+    copy = Email(message_id="<other@x>", sender="Sender", subject="Daily Brief", date=NOW,
+                 text=first.text, sender_address=first.sender_address)
+    calls = []
+    summary = _run(store, [first, copy], edit=lambda m: calls.append(m.message_id) or _article(m))
+    assert calls == ["<m1@x>"] and summary["read"] == 1
+    # And a later run doesn't bring the copy back.
+    assert _run(store, [first, copy])["read"] == 0
+    assert len(_state(store)["episodes"]) == 1

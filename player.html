@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#f7f6f3" media="(prefers-color-scheme: light)">
@@ -22,7 +22,7 @@
 :root{--hl:#e7eee3;--seen:#ecebe6;--page:#f7f6f3;--fg1:#14140f;--fg2:#5b5a52;--fg3:#6f6d64;--acc:#0e700e;--crit:#9c2f1f;--rule:#dedcd4;--ui:"Space Grotesk",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace;color-scheme:light}
 @media (prefers-color-scheme:dark){:root{--hl:#1b2519;--seen:#1b1b19;--page:#111110;--fg1:#f2f1ec;--fg2:#a8a69c;--fg3:#8b8981;--acc:#73ac73;--crit:#c6867d;--rule:#2b2b28;color-scheme:dark}}
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;touch-action:manipulation}
 body{overscroll-behavior-y:contain;margin:0;background:var(--page);color:var(--fg1);font-family:var(--ui);font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
@@ -163,6 +163,9 @@ ol{list-style:none;margin:0;padding:0}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chips button{height:44px;min-width:56px;padding:0 12px;border:1px solid var(--rule);font-family:var(--mono);font-size:13px}
 .chips button[aria-pressed="true"]{border-color:var(--acc);background:var(--acc);color:var(--page)}
+.addrow{display:flex;gap:8px;margin-bottom:8px}
+.addrow input{flex:1;min-width:0;height:48px;padding:0 12px;border:1px solid var(--rule);background:transparent;color:var(--fg1);font:inherit;font-size:16px}
+.addrow button{flex:none;height:48px;padding:0 18px;background:var(--acc);color:var(--page);font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase}
 .wide{width:100%;height:48px;border:1px solid var(--rule);font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--acc)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -245,6 +248,13 @@ ol{list-style:none;margin:0;padding:0}
         <span class="label">Listening speed</span>
         <p>Your usual speed on this phone. The 1× button in the player still changes it on the fly.</p>
         <div class="chips" id="sSpeeds"></div>
+      </div>
+      <div class="sec">
+        <span class="label">Add a link or file</span>
+        <p>Paste a web link, or pick a PDF, Word document or text file. On your phone you can also share straight to Read Me from any app.</p>
+        <div class="addrow"><input type="url" id="sLink" placeholder="https://…" inputmode="url" autocomplete="off"><button type="button" id="sAddLink">Add</button></div>
+        <button type="button" class="wide" id="sAddFile">＋ Pick a file</button>
+        <input type="file" id="sFile" accept=".pdf,.docx,.txt,.md,.html,.htm,application/pdf,text/plain,text/markdown,text/html" hidden>
       </div>
       <div class="sec">
         <button type="button" class="wide" id="sCheck">↻ Check for new mail now</button>
@@ -729,7 +739,14 @@ function syncStory() {
   const g = blockEls[i].dataset.g;
   lit = g === undefined ? [blockEls[i]] : [...$("rBody").querySelectorAll(`[data-g="${g}"]`)];
   for (const el of lit) el.classList.add("speaking");
-  if (follow && !audio.paused) blockEls[i].scrollIntoView({ block: "center", behavior: calm ? "auto" : "smooth" });
+  if (follow && !audio.paused) scrollToSpoken(blockEls[i]);
+}
+
+// Centre the paragraph being read, unless it's taller than the screen: then
+// line up its top so its first words stay visible.
+function scrollToSpoken(el) {
+  const tall = el.getBoundingClientRect().height > $("reader").clientHeight - 192;
+  el.scrollIntoView({ block: tall ? "start" : "center", behavior: calm ? "auto" : "smooth" });
 }
 
 function stopFollowing() {
@@ -743,7 +760,7 @@ $("reader").addEventListener("keydown", e => { if (/^(Arrow|Page|Home|End| )/.te
 $("follow").addEventListener("click", () => {
   follow = true;
   $("follow").hidden = true;
-  if (blockEls[lastNow]) blockEls[lastNow].scrollIntoView({ block: "center", behavior: calm ? "auto" : "smooth" });
+  if (blockEls[lastNow]) scrollToSpoken(blockEls[lastNow]);
 });
 
 // Tap a paragraph to jump the audio there (links still open as links).
@@ -1111,34 +1128,103 @@ window.addEventListener("touchend", () => {
   if (pulled > PULL) checkNow(); else pullText("");
 });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-async function checkNow() {
+// Wait for the run started at `at` to finish, then reload to show what's new.
+async function waitForRun(at) {
+  const since = new Date(at).getTime() - 15000;
+  for (let i = 0; i < 75; i++) {  // a run takes about a minute; give up after five
+    await sleep(4000);
+    const st = await callVoice("checkstatus");
+    if (!st.created || new Date(st.created).getTime() < since || st.status !== "completed") continue;
+    if (st.conclusion === "success") {
+      pullText("Up to date. Loading…", true);
+      location.reload();
+      return;
+    }
+    throw new Error("The check ran into a problem. Details are in GitHub → Actions.");
+  }
+  throw new Error("Still working on it. It'll show up when it's done.");
+}
+async function busy(label, work) {
   if (checking) return;
   checking = true;
-  pullText("Checking for new mail…", true);
+  pullText(label, true);
   try {
-    const started = await callVoice("check");
-    const since = new Date(started.at).getTime() - 15000;
-    for (let i = 0; i < 30; i++) {  // a run takes about a minute; give up after five
-      await sleep(10000);
-      const st = await callVoice("checkstatus");
-      if (!st.created || new Date(st.created).getTime() < since || st.status !== "completed") continue;
-      if (st.conclusion === "success") {
-        pullText("Up to date. Loading…", true);
-        location.reload();
-        return;
-      }
-      throw new Error("The check ran into a problem. Details are in GitHub → Actions.");
-    }
-    throw new Error("Still checking. New emails will show up when it's done.");
+    await work();
   } catch (err) {
     pullText(err.message, true);
-    setTimeout(() => pullText(""), 6000);
+    setTimeout(() => pullText(""), 8000);
   }
   checking = false;
 }
+function checkNow() {
+  return busy("Checking for new mail…", async () => {
+    const started = await callVoice("check");
+    await waitForRun(started.at);
+  });
+}
+
+// ---- Sharing to Read Me (share menu, or Settings → Add a link or file) ----
+const MAX_SHARE = 15 * 1024 * 1024;
+async function toBase64(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+function addToReadMe({ title = "", text = "", url = "", files = [] }) {
+  return busy("Adding to Read Me…", async () => {
+    let result = null;
+    if (files.length) {
+      for (const f of files) {
+        if (f.size > MAX_SHARE) throw new Error(`${f.name} is too big (over 15 MB).`);
+        result = await callVoice("add", { title, text, url, file: { name: f.name, type: f.type, data: await toBase64(f) } });
+      }
+    } else {
+      result = await callVoice("add", { title, text, url });
+    }
+    if (result && result.checking) {
+      pullText("Added. Getting it ready…", true);
+      await waitForRun(result.at);
+    } else {
+      pullText("Added. It'll show up after the next check.", true);
+      setTimeout(() => pullText(""), 6000);
+    }
+  });
+}
+async function receiveShared() {
+  if (!/[?&]shared=1/.test(location.search)) return;
+  history.replaceState(null, "", location.pathname);
+  let form;
+  try {
+    const cache = await caches.open("read-me-share");
+    const key = new URL("shared-pending", location.href).href;
+    const res = await cache.match(key);
+    if (!res) return;
+    form = await res.formData();
+    await cache.delete(key);
+  } catch { return; }
+  const files = form.getAll("files").filter(f => f && typeof f === "object" && f.size);
+  await addToReadMe({ title: form.get("title") || "", text: form.get("text") || "", url: form.get("url") || "", files });
+}
+$("sAddLink").addEventListener("click", () => {
+  const url = $("sLink").value.trim();
+  if (!/^https?:\/\//i.test(url)) { settingsNote("Paste a full web link, starting with https://"); return; }
+  $("sLink").value = "";
+  closeSettings();
+  addToReadMe({ url });
+});
+$("sAddFile").addEventListener("click", () => $("sFile").click());
+$("sFile").addEventListener("change", () => {
+  const files = [...$("sFile").files];
+  $("sFile").value = "";
+  if (!files.length) return;
+  closeSettings();
+  addToReadMe({ files });
+});
 
 render();
 keepOffline();
+receiveShared();
 </script>
 </body>
 </html>

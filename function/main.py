@@ -12,6 +12,9 @@ The app sends a POST with JSON: "secret" (your private folder name) and an
     sample    {"voice": "<voice name>"}     a short sample of a voice
     remove    {"id": "<email id>"}          remove an email you swiped away (the
                                             hourly run deletes its files)
+    add       {"title", "text", "url", "file": {"name", "type", "data" (base64)}}
+                                            save something shared from the phone and
+                                            start a run to turn it into an article
     check     {}                            look for new mail now: starts the
                                             "Read my emails" workflow on GitHub
     checkstatus {}                          how that run is going
@@ -22,8 +25,11 @@ address couldn't use it to read out anything else. Deployed by
 store.py from the repo.
 """
 
+import base64
+import binascii
 import hmac
 import json
+import secrets
 import os
 import re
 import urllib.error
@@ -33,6 +39,7 @@ from datetime import datetime, timedelta, timezone
 import functions_framework
 
 import article
+import documents
 import store as storage
 import voice
 
@@ -40,6 +47,7 @@ ALLOWED_ORIGIN = "https://storage.googleapis.com"  # where the Read Me app lives
 SAMPLE_TEXT = ("Here's how I'll sound reading your newsletters. Corn futures closed higher "
                "on Friday, and the weekend looks dry across most of the Midwest.")
 CHECK_COOLDOWN = timedelta(seconds=90)
+MAX_SHARE_BYTES = 15 * 1024 * 1024
 WORKFLOW = "read-emails.yml"
 
 _bucket = None
@@ -75,6 +83,8 @@ def handle(request):
             return _reply(sample(store, str(body.get("voice", ""))))
         if action == "remove":
             return _reply(remove_email(store, str(body.get("id", ""))))
+        if action == "add":
+            return _reply(add_shared(store, body))
         if action == "check":
             return _reply(check_now(store))
         if action == "checkstatus":
@@ -160,12 +170,46 @@ def sample(store, voice_name: str, speak=None) -> dict:
     return {"url": store.url(path)}
 
 
-def check_now(store, now: datetime | None = None, github=None) -> dict:
+def add_shared(store, body: dict, now: datetime | None = None, github=None) -> dict:
+    """Save text, a link or a file shared from the phone, then start a run."""
+    now = now or datetime.now(timezone.utc)
+    title = str(body.get("title") or "").strip()[:300]
+    text = str(body.get("text") or "").strip()[:200_000]
+    url = str(body.get("url") or "").strip()[:2000]
+    item_id = secrets.token_hex(6)
+    meta = {"id": item_id, "title": title, "text": text, "url": url, "at": now.isoformat()}
+    shared_file = body.get("file")
+    if shared_file:
+        if not isinstance(shared_file, dict):
+            raise Refused("That file wasn't understood.", 400)
+        name = str(shared_file.get("name") or "file")[:200]
+        kind = documents.kind_of(name, str(shared_file.get("type") or ""))
+        if not kind:
+            raise Refused("Read Me can read PDFs, Word documents, text files and web pages.", 415)
+        try:
+            data = base64.b64decode(str(shared_file.get("data") or ""), validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise Refused("That file didn't come through. Try sharing it again.", 400) from exc
+        if not data or len(data) > MAX_SHARE_BYTES:
+            raise Refused("That file is empty or too big (over 15 MB).", 413)
+        store.write(f"inbox/{item_id}.bin", data, "application/octet-stream")
+        meta.update(filename=name, content_type=kind)
+    elif not (text or url):
+        raise Refused("There was nothing to add.", 400)
+    store.write(f"inbox/{item_id}.json", json.dumps(meta), "application/json")
+    try:
+        started = check_now(store, now, github=github, force=True)["started"]
+    except Refused:
+        started = False  # "check now" isn't set up; the next scheduled run picks it up
+    return {"added": item_id, "checking": started, "at": now.isoformat()}
+
+
+def check_now(store, now: datetime | None = None, github=None, force: bool = False) -> dict:
     """Start the hourly "Read my emails" run right away."""
     now = now or datetime.now(timezone.utc)
     github = github or _github
     last = (store.read_json("checked.json") or {}).get("at")
-    if last and now - datetime.fromisoformat(last) < CHECK_COOLDOWN:
+    if not force and last and now - datetime.fromisoformat(last) < CHECK_COOLDOWN:
         return {"started": False, "at": last}  # one is already on its way
     ref = os.environ.get("GH_REF") or "main"
     github("POST", f"actions/workflows/{WORKFLOW}/dispatches", {"ref": ref})

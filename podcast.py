@@ -93,6 +93,20 @@ def build_manifest(title: str) -> str:
         "display": "standalone",
         "background_color": ink,
         "theme_color": ink,
+        # Puts Read Me in the phone's share menu for text, links and documents.
+        "share_target": {
+            "action": "./share",
+            "method": "POST",
+            "enctype": "multipart/form-data",
+            "params": {
+                "title": "title", "text": "text", "url": "url",
+                "files": [{"name": "files", "accept": [
+                    "application/pdf", ".pdf", "text/plain", ".txt", "text/markdown", ".md",
+                    "text/html", ".html", ".htm", ".docx",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                ]}],
+            },
+        },
         "icons": [
             {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
             {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
